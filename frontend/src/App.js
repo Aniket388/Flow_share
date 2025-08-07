@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import { Upload, Users, Send, FileText, Wifi, Loader2 } from 'lucide-react';
+import { Upload, Users, Send, FileText, Wifi, Loader2, Download, Copy, X, CheckCircle, AlertCircle } from 'lucide-react';
 import { Button } from './components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './components/ui/card';
 import { Textarea } from './components/ui/textarea';
@@ -21,10 +21,12 @@ const App = () => {
   const [connectionStatus, setConnectionStatus] = useState('disconnected');
   const [currentShare, setCurrentShare] = useState(null);
   const [showShareModal, setShowShareModal] = useState(false);
+  const [showReceiveModal, setShowReceiveModal] = useState(false);
+  const [receivedShare, setReceivedShare] = useState(null);
+  const [isDownloading, setIsDownloading] = useState(false);
   
   const websocketRef = useRef(null);
   const fileInputRef = useRef(null);
-  const peerConnections = useRef({});
 
   const backendUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
 
@@ -43,7 +45,7 @@ const App = () => {
     
     ws.onopen = () => {
       setConnectionStatus('connected');
-      toast.success('Connected to FlowShare network!');
+      toast.success('🌟 Connected to FlowShare network!');
     };
     
     ws.onmessage = (event) => {
@@ -53,12 +55,14 @@ const App = () => {
     
     ws.onclose = () => {
       setConnectionStatus('disconnected');
+      toast.error('⚠️ Connection lost. Reconnecting...');
       setTimeout(connectWebSocket, 3000); // Reconnect after 3 seconds
     };
     
     ws.onerror = (error) => {
       console.error('WebSocket error:', error);
       setConnectionStatus('error');
+      toast.error('❌ Connection error. Retrying...');
     };
     
     websocketRef.current = ws;
@@ -68,7 +72,7 @@ const App = () => {
     switch (message.type) {
       case 'character_assigned':
         setMyCharacter(message.character);
-        toast.success(`You are now ${message.character}!`);
+        toast.success(`🦸‍♂️ You are now ${message.character}!`);
         break;
       
       case 'user_list_update':
@@ -84,6 +88,14 @@ const App = () => {
         handleIncomingShare(message);
         break;
       
+      case 'share_success':
+        toast.success(`✅ ${message.message}`);
+        break;
+      
+      case 'share_failed':
+        toast.error(`❌ ${message.message}`);
+        break;
+      
       default:
         console.log('Unknown message type:', message.type);
     }
@@ -95,8 +107,20 @@ const App = () => {
   };
 
   const handleIncomingShare = (message) => {
-    toast.success(`${message.from_character} sent you a ${message.share_data.type}!`);
-    // Handle incoming file/text share
+    const shareType = message.share_data.type;
+    const fromCharacter = message.from_character;
+    
+    // Show immediate notification
+    toast.success(`🦸‍♂️ ${fromCharacter} is sharing ${shareType === 'file' ? 'a file' : 'a note'} with you!`);
+    
+    // Set received share data and show modal
+    setReceivedShare({
+      from_character: fromCharacter,
+      from_user_id: message.from_user_id,
+      share_data: message.share_data,
+      timestamp: message.timestamp
+    });
+    setShowReceiveModal(true);
   };
 
   const sendWebRTCSignal = (toUserId, signalData) => {
@@ -151,10 +175,10 @@ const App = () => {
       
       setCurrentShare(response.data);
       setShowShareModal(true);
-      toast.success('File uploaded successfully!');
+      toast.success('📁 File uploaded successfully!');
       
     } catch (error) {
-      toast.error('Failed to upload file. Please try again.');
+      toast.error('❌ Failed to upload file. Please try again.');
       console.error('Upload error:', error);
     } finally {
       setIsUploading(false);
@@ -177,10 +201,10 @@ const App = () => {
       setCurrentShare(response.data);
       setShowShareModal(true);
       setTextContent('');
-      toast.success('Text note ready to share!');
+      toast.success('📝 Text note ready to share!');
       
     } catch (error) {
-      toast.error('Failed to create text share. Please try again.');
+      toast.error('❌ Failed to create text share. Please try again.');
       console.error('Text share error:', error);
     }
   };
@@ -197,7 +221,7 @@ const App = () => {
 
   const handleShareNow = () => {
     if (selectedUsers.size === 0) {
-      toast.error('Please select at least one user to share with.');
+      toast.error('Please select at least one hero to share with.');
       return;
     }
     
@@ -208,10 +232,87 @@ const App = () => {
         share_data: currentShare
       }));
       
-      toast.success(`Shared with ${selectedUsers.size} Marvel hero${selectedUsers.size > 1 ? 's' : ''}!`);
       setShowShareModal(false);
       setSelectedUsers(new Set());
       setCurrentShare(null);
+    } else {
+      toast.error('❌ Connection lost. Please try again.');
+    }
+  };
+
+  const handleCopyText = async () => {
+    if (!receivedShare?.share_data?.content) return;
+    
+    try {
+      await navigator.clipboard.writeText(receivedShare.share_data.content);
+      toast.success('📋 Text copied to clipboard!');
+    } catch (error) {
+      // Fallback for older browsers
+      const textArea = document.createElement('textarea');
+      textArea.value = receivedShare.share_data.content;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+      toast.success('📋 Text copied to clipboard!');
+    }
+  };
+
+  const handleDownloadFile = async () => {
+    if (!receivedShare?.share_data?.file_id) return;
+    
+    setIsDownloading(true);
+    
+    try {
+      const response = await axios.get(`${backendUrl}/api/download/${receivedShare.share_data.file_id}`, {
+        responseType: 'blob'
+      });
+      
+      // Create download link
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', receivedShare.share_data.filename);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
+      toast.success('📁 File downloaded successfully!');
+    } catch (error) {
+      console.error('Download error:', error);
+      toast.error('❌ Failed to download file. Please try again.');
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
+  const closeReceiveModal = () => {
+    setShowReceiveModal(false);
+    setReceivedShare(null);
+  };
+
+  const getFileIcon = (filename) => {
+    const extension = filename?.split('.').pop()?.toLowerCase();
+    switch (extension) {
+      case 'pdf':
+        return '📄';
+      case 'doc':
+      case 'docx':
+        return '📝';
+      case 'jpg':
+      case 'jpeg':
+      case 'png':
+      case 'gif':
+        return '🖼️';
+      case 'mp4':
+      case 'avi':
+        return '🎥';
+      case 'mp3':
+      case 'wav':
+        return '🎵';
+      default:
+        return '📁';
     }
   };
 
@@ -225,12 +326,22 @@ const App = () => {
           </h1>
           <p className="text-gray-300 text-xl">P2P Marvel Share Network</p>
           
+          {/* Your Character Identity */}
+          {myCharacter && (
+            <div className="mt-6 p-4 bg-gradient-to-r from-blue-600/20 to-purple-600/20 rounded-lg border border-blue-500/30">
+              <h2 className="text-3xl font-bold text-white mb-2">
+                You are: <span className="text-blue-400">{myCharacter}</span>
+              </h2>
+              <p className="text-gray-300">Your Marvel identity on the network</p>
+            </div>
+          )}
+          
           {/* Connection Status */}
           <div className="flex items-center justify-center gap-2 mt-4">
             <Wifi className={`w-5 h-5 ${connectionStatus === 'connected' ? 'text-green-400' : 'text-red-400'}`} />
             <span className={`text-sm ${connectionStatus === 'connected' ? 'text-green-400' : 'text-red-400'}`}>
               {connectionStatus === 'connected' 
-                ? `Connected as ${myCharacter}` 
+                ? `Connected to network` 
                 : 'Connecting to network...'}
             </span>
           </div>
@@ -392,6 +503,85 @@ const App = () => {
                     className="border-slate-600 text-gray-300 hover:bg-slate-700"
                   >
                     Cancel
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* Receive Modal */}
+        {showReceiveModal && receivedShare && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+            <Card className="bg-slate-800 border-slate-700 w-full max-w-md">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-white flex items-center gap-2">
+                    <CheckCircle className="w-5 h-5 text-green-400" />
+                    {receivedShare.from_character} sent you something!
+                  </CardTitle>
+                  <Button
+                    onClick={closeReceiveModal}
+                    variant="ghost"
+                    size="sm"
+                    className="text-gray-400 hover:text-white"
+                  >
+                    <X className="w-4 h-4" />
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="p-4 bg-slate-700/50 rounded-lg">
+                  {receivedShare.share_data.type === 'file' ? (
+                    <div className="flex items-center gap-3">
+                      <span className="text-2xl">{getFileIcon(receivedShare.share_data.filename)}</span>
+                      <div>
+                        <p className="text-white font-medium">{receivedShare.share_data.filename}</p>
+                        <p className="text-gray-400 text-sm">
+                          {Math.round(receivedShare.share_data.size / 1024)} KB
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div>
+                      <p className="text-white font-medium mb-2">{receivedShare.share_data.title}</p>
+                      <p className="text-gray-300 text-sm max-h-32 overflow-y-auto">
+                        {receivedShare.share_data.content}
+                      </p>
+                    </div>
+                  )}
+                </div>
+                
+                <div className="flex gap-2">
+                  {receivedShare.share_data.type === 'file' ? (
+                    <Button
+                      onClick={handleDownloadFile}
+                      disabled={isDownloading}
+                      className="flex-1 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700"
+                    >
+                      {isDownloading ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <Download className="w-4 h-4 mr-2" />
+                      )}
+                      Download File
+                    </Button>
+                  ) : (
+                    <Button
+                      onClick={handleCopyText}
+                      className="flex-1 bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700"
+                    >
+                      <Copy className="w-4 h-4 mr-2" />
+                      Copy Text
+                    </Button>
+                  )}
+                  
+                  <Button
+                    onClick={closeReceiveModal}
+                    variant="outline"
+                    className="border-slate-600 text-gray-300 hover:bg-slate-700"
+                  >
+                    Close
                   </Button>
                 </div>
               </CardContent>

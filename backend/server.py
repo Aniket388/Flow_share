@@ -1,6 +1,6 @@
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, UploadFile, File
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import json
@@ -9,6 +9,8 @@ import random
 from datetime import datetime, timedelta
 from typing import Dict, List
 import asyncio
+import shutil
+from pathlib import Path
 
 app = FastAPI()
 
@@ -26,6 +28,10 @@ MONGO_URL = os.environ.get("MONGO_URL", "mongodb://localhost:27017")
 client = AsyncIOMotorClient(MONGO_URL)
 db = client.flowshare
 
+# File storage directory
+UPLOAD_DIR = Path("/tmp/flowshare_files")
+UPLOAD_DIR.mkdir(exist_ok=True)
+
 # Marvel characters list
 MARVEL_CHARACTERS = [
     "Iron Man", "Captain America", "Thor", "Hulk", "Black Widow", "Hawkeye",
@@ -33,7 +39,7 @@ MARVEL_CHARACTERS = [
     "Black Panther", "Falcon", "Winter Soldier", "Ant-Man", "Wasp",
     "Star-Lord", "Gamora", "Drax", "Rocket", "Groot", "Nebula",
     "Loki", "Vision", "War Machine", "Quicksilver", "Shuri", "Okoye",
-    "Valkyrie", "Captain Marvel", "Ms. Marvel", "She-Hulk", "Moon Knight",
+    "Valkyrie", "Ms. Marvel", "She-Hulk", "Moon Knight",
     "Daredevil", "Jessica Jones", "Luke Cage", "Iron Fist", "Punisher"
 ]
 
@@ -120,6 +126,7 @@ class ConnectionManager:
     async def send_share_notification(self, from_user_id: str, to_user_ids: List[str], share_data: dict):
         from_character = self.user_sessions.get(from_user_id, {}).get('character', 'Unknown')
         
+        # Enhanced share notification with download/copy functionality
         message = {
             'type': 'incoming_share',
             'from_user_id': from_user_id,
@@ -128,8 +135,31 @@ class ConnectionManager:
             'timestamp': datetime.utcnow().isoformat()
         }
         
+        success_count = 0
+        failed_users = []
+        
         for to_user_id in to_user_ids:
-            await self.send_personal_message(to_user_id, message)
+            try:
+                await self.send_personal_message(to_user_id, message)
+                success_count += 1
+            except Exception as e:
+                failed_users.append(to_user_id)
+                print(f"Failed to send to {to_user_id}: {str(e)}")
+        
+        # Send success/failure notification back to sender
+        if success_count > 0:
+            await self.send_personal_message(from_user_id, {
+                'type': 'share_success',
+                'message': f'Successfully shared with {success_count} Marvel hero{"s" if success_count > 1 else ""}!',
+                'success_count': success_count
+            })
+        
+        if failed_users:
+            await self.send_personal_message(from_user_id, {
+                'type': 'share_failed',
+                'message': f'Failed to share with {len(failed_users)} user{"s" if len(failed_users) > 1 else ""}. Please try again.',
+                'failed_count': len(failed_users)
+            })
 
 manager = ConnectionManager()
 
@@ -168,12 +198,18 @@ async def upload_file(file: UploadFile = File(...)):
         # Generate unique file ID
         file_id = str(uuid.uuid4())
         
+        # Save file to disk
+        file_path = UPLOAD_DIR / f"{file_id}_{file.filename}"
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+        
         # Store file metadata in database
         file_doc = {
             "file_id": file_id,
             "filename": file.filename,
             "content_type": file.content_type,
             "size": file.size,
+            "file_path": str(file_path),
             "uploaded_at": datetime.utcnow(),
             "expires_at": datetime.utcnow() + timedelta(hours=24)
         }
@@ -184,11 +220,41 @@ async def upload_file(file: UploadFile = File(...)):
             "file_id": file_id,
             "filename": file.filename,
             "size": file.size,
+            "content_type": file.content_type,
             "type": "file"
         }
         
     except Exception as e:
-        return {"error": str(e)}, 500
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/download/{file_id}")
+async def download_file(file_id: str):
+    try:
+        # Find file in database
+        file_doc = await db.files.find_one({"file_id": file_id})
+        
+        if not file_doc:
+            raise HTTPException(status_code=404, detail="File not found")
+        
+        # Check if file has expired
+        if datetime.utcnow() > file_doc['expires_at']:
+            raise HTTPException(status_code=410, detail="File has expired")
+        
+        file_path = Path(file_doc['file_path'])
+        
+        if not file_path.exists():
+            raise HTTPException(status_code=404, detail="File not found on disk")
+        
+        return FileResponse(
+            path=file_path,
+            filename=file_doc['filename'],
+            media_type=file_doc['content_type']
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/create-text-share")
 async def create_text_share(data: dict):
@@ -215,7 +281,32 @@ async def create_text_share(data: dict):
         }
         
     except Exception as e:
-        return {"error": str(e)}, 500
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/text/{share_id}")
+async def get_text_share(share_id: str):
+    try:
+        # Find text share in database
+        text_doc = await db.text_shares.find_one({"share_id": share_id})
+        
+        if not text_doc:
+            raise HTTPException(status_code=404, detail="Text share not found")
+        
+        # Check if text has expired
+        if datetime.utcnow() > text_doc['expires_at']:
+            raise HTTPException(status_code=410, detail="Text share has expired")
+        
+        return {
+            "share_id": text_doc["share_id"],
+            "title": text_doc["title"],
+            "content": text_doc["content"],
+            "created_at": text_doc["created_at"].isoformat()
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/active-users")
 async def get_active_users():
