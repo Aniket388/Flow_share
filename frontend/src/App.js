@@ -38,7 +38,7 @@ const App = () => {
   }, []);
 
   const connectWebSocket = () => {
-    const wsUrl = backendUrl.replace('http', 'ws') + `/ws/${userId}`;
+    const wsUrl = backendUrl.replace('http', 'ws') + `/api/ws/${userId}`;
     const ws = new WebSocket(wsUrl);
     
     ws.onopen = () => {
