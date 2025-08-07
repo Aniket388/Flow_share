@@ -57,7 +57,7 @@ class FlowShareAPITester:
         """Test WebSocket connection and Marvel character assignment"""
         print(f"\n🔍 Testing WebSocket Connection...")
         
-        ws_url = self.base_url.replace('https', 'wss') + f"/ws/{user_id}"
+        ws_url = self.base_url.replace('https', 'wss') + f"/api/ws/{user_id}"
         print(f"   WebSocket URL: {ws_url}")
         
         def on_message(ws, message):
