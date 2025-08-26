@@ -10,16 +10,14 @@ from typing import Dict, List, AsyncGenerator
 import shutil
 from pathlib import Path
 
-# --- NEW: SQLAlchemy Imports ---
+# --- SQLAlchemy Imports ---
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker, declarative_base
 from sqlalchemy import Column, String, Integer, DateTime, Text, select
-# --- END NEW ---
 
 app = FastAPI()
 
-# --- MODIFIED: More secure CORS middleware ---
-# It now reads the frontend URL from an environment variable
+# --- More secure CORS middleware ---
 origins = [
     os.environ.get("FRONTEND_URL", "http://localhost:3000")
 ]
@@ -30,16 +28,22 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-# --- END MODIFIED ---
 
-# --- NEW: SQLAlchemy Database Setup ---
-DATABASE_URL = os.environ.get("DATABASE_URL", "postgresql+asyncpg://user:password@localhost/db")
+# --- MODIFIED: SQLAlchemy Database Setup with URL Fix ---
+DATABASE_URL = os.environ.get("DATABASE_URL")
+
+# Render's database URL uses "postgresql://", but SQLAlchemy's async engine needs "postgresql+asyncpg://"
+# We'll replace the scheme to make it compatible.
+if DATABASE_URL and DATABASE_URL.startswith("postgresql://"):
+    DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://", 1)
 
 engine = create_async_engine(DATABASE_URL)
 AsyncSessionLocal = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 Base = declarative_base()
+# --- END MODIFIED ---
 
-# --- NEW: Define database table models ---
+
+# --- Define database table models ---
 class FileStorage(Base):
     __tablename__ = "files"
     id = Column(Integer, primary_key=True)
@@ -60,27 +64,21 @@ class TextShare(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     expires_at = Column(DateTime)
 
-# --- NEW: Function to create tables on startup ---
+# --- Function to create tables on startup ---
 @app.on_event("startup")
 async def startup():
     async with engine.begin() as conn:
-        # This creates the tables if they don't exist.
-        # For production, a migration tool like Alembic is recommended.
         await conn.run_sync(Base.metadata.create_all)
 
-# --- NEW: Dependency to get a database session for each request ---
+# --- Dependency to get a database session for each request ---
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     async with AsyncSessionLocal() as session:
         yield session
-# --- END NEW ---
 
 
 # File storage directory (ephemeral on Render's free tier)
 UPLOAD_DIR = Path("/tmp/flowshare_files")
 UPLOAD_DIR.mkdir(exist_ok=True)
-
-# (ConnectionManager and MARVEL_CHARACTERS code remains the same as before)
-# ... [Paste your existing MARVEL_CHARACTERS list and ConnectionManager class here] ...
 
 # Marvel characters list
 MARVEL_CHARACTERS = [
@@ -207,7 +205,6 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str):
 async def health_check():
     return {"status": "healthy", "service": "FlowShare P2P"}
 
-# --- MODIFIED: Endpoints now use SQLAlchemy session ---
 @app.post("/api/upload")
 async def upload_file(file: UploadFile = File(...), db: AsyncSession = Depends(get_db)):
     try:
@@ -216,7 +213,6 @@ async def upload_file(file: UploadFile = File(...), db: AsyncSession = Depends(g
         with open(file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
         
-        # Create a new FileStorage object and add it to the database
         new_file = FileStorage(
             file_id=file_id,
             filename=file.filename,
@@ -238,7 +234,6 @@ async def upload_file(file: UploadFile = File(...), db: AsyncSession = Depends(g
 @app.get("/api/download/{file_id}")
 async def download_file(file_id: str, db: AsyncSession = Depends(get_db)):
     try:
-        # Query the database for the file
         query = select(FileStorage).where(FileStorage.file_id == file_id)
         result = await db.execute(query)
         file_doc = result.scalars().first()
@@ -304,4 +299,3 @@ async def get_text_share(share_id: str, db: AsyncSession = Depends(get_db)):
 async def get_active_users():
     user_list = [{'user_id': user_id, 'character': session['character']} for user_id, session in manager.user_sessions.items()]
     return {"users": user_list}
-# --- END MODIFIED ---
