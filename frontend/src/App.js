@@ -11,49 +11,13 @@ import { Input } from './components/ui/input';
 import './App.css';
 
 const sizeErrorMessages = [
-    "This file is too heavy for even the Hulk!",
-    "S.H.I.E.L.D. protocols limit transfers to 100MB.",
-    "My Pym Particle supply is low. Can't handle files over 100MB.",
-    "Even Mjolnir isn't this heavy. Please keep files under 100MB.",
-    "JARVIS reports this file's data signature is too large. Keep it under 100MB.",
-    "Perfectly balanced... this file is not. Must be under 100MB to maintain cosmic order.",
-    "Language! That's a big file. The limit here is 100MB, soldier.",
-    "Are you trying to send a whole moon? This system can't handle more than 100MB!",
-    "With great file size comes great server responsibility. The 100MB limit must be respected.",
-    "Even Vibranium servers have their limits. Files over 100MB cannot be processed.",
-    "This file has been classified as a Level 7 threat. All transmissions must be under 100MB.",
-    "Looks like you'll need some PYM particles for that file! Must be under 100MB.",
-    "The bifrost can't sustain a transfer of this magnitude! Keep it under 100MB.",
-    "This file's energy signature is too large for the Tesseract. Keep transfers under 100MB.",
-    "This file is too heavy for a cosmic flight. It's over the 100MB weight limit.",
-    "SMASH! This file is too big! Keep it under 100MB before things get... angry.",
-    "This file is a Nexus event. Prune it to under 100MB to protect the Sacred Timeline.",
-    "I can do this all day. But I can't upload a file over 100MB.",
-    "On your left... is a smaller file, I hope. This one exceeds the 100MB limit.",
-    "This file is too big. I don't feel so good... Try something under 100MB.",
-    "I went forward in time to view 14,000,605 futures. In none of them does this upload succeed.",
-    "That's my secret, Cap. I'm always angry... at files over 100MB.",
-    "I love you 3000, but I don't love files over 100MB.",
-    "This file is too big to fit in the Quantum Realm. Please shrink it to under 100MB.",
-    "Cerebro has detected a file with a power signature that is off the charts. Max capacity is 100MB."
+    "This file is too heavy for even the Hulk!", "S.H.I.E.L.D. protocols limit transfers to 100MB.",
+    "My Pym Particle supply is low. Can't handle files over 100MB.", "Even Mjolnir isn't this heavy. Please keep files under 100MB.",
+    "JARVIS reports this file's data signature is too large. Keep it under 100MB."
 ];
-
 const timeoutErrorMessages = [
-  "The Bifrost connection is unstable! Upload timed out.",
-  "Strange can't keep the portal open this long. Upload timed out.",
-  "Thanos snapped... and so did your upload. Timed out!",
-  "Loki's mischief is messing with our servers. Upload timed out.",
-  "SHIELD's satellites lost the signal. Upload timed out.",
-  "Ultron hijacked the network again. Upload timed out.",
-  "Even with super speed, this connection is too slow. Upload timed out.",
-  "Looks like we hit a time-dilation field. Upload timed out.",
-  "Our communications with the Wakandan network are experiencing lag. Too slow to upload.",
-  "The cosmic data stream is congested. Upload timed out.",
-  "Fury says the connection is compromised! Too slow to upload.",
-  "This upload is taking longer than a Pym Particle re-calibration. Timed out!",
-  "Even with a power stone, we can't speed up this connection. Upload timed out.",
-  "The timelines are not aligning for this upload. Timed out!",
-  "JARVIS reports a network anomaly. Upload timed out."
+  "The Bifrost connection is unstable! Upload timed out.", "Even with super speed, this connection is too slow. Upload cancelled.",
+  "Looks like we hit a time-dilation field. Upload timed out."
 ];
 
 const App = () => {
@@ -339,20 +303,35 @@ const App = () => {
                 <Card className="bg-slate-800 border-slate-700 w-full max-w-lg h-[70vh] flex flex-col">
                     <CardHeader><div className="flex justify-between items-center"><CardTitle className="text-white flex items-center gap-2"><MessageSquare className="w-5 h-5 text-blue-400" />Chat with {activeChatUser.character}</CardTitle><Button onClick={() => setActiveChatUser(null)} variant="ghost" size="sm" className="text-gray-400 hover:text-white"><X className="w-4 h-4" /></Button></div></CardHeader>
                     <CardContent className="flex-1 overflow-y-auto p-4 space-y-4">
-                        {/* CORRECTED: Chat message alignment logic */}
-                        {(chats[activeChatUser.user_id] || []).map((msg, index) => (
-                          <div key={index} className={`flex w-full items-start gap-2.5 ${msg.sender === myCharacter ? 'justify-end' : 'justify-start'}`}>
-                            {msg.sender !== myCharacter && (
-                                <Badge variant="secondary" className="bg-slate-600 text-gray-200 w-8 h-8 flex items-center justify-center flex-shrink-0">{msg.sender.charAt(0)}</Badge>
-                            )}
-                            <div className={`p-3 rounded-lg max-w-xs md:max-w-md ${msg.sender === myCharacter ? 'bg-blue-600 text-white rounded-br-none' : 'bg-slate-700 text-gray-200 rounded-bl-none'}`}>
-                                <p className="text-sm" style={{ wordBreak: 'break-word' }}>{msg.content}</p>
-                            </div>
-                            {msg.sender === myCharacter && (
-                                <Badge variant="secondary" className="bg-blue-600 text-white w-8 h-8 flex items-center justify-center flex-shrink-0">{myCharacter.charAt(0)}</Badge>
-                            )}
-                          </div>
-                        ))}
+                        {/* --- MODIFIED: This is the new, corrected chat bubble logic --- */}
+                        {(chats[activeChatUser.user_id] || []).map((msg, index) => {
+                            const isMyMessage = msg.sender === myCharacter;
+                            if (isMyMessage) {
+                                // My message (right aligned)
+                                return (
+                                    <div key={index} className="flex w-full justify-end">
+                                        <div className="flex items-start gap-2.5">
+                                            <div className="bg-blue-600 text-white p-3 rounded-lg max-w-xs md:max-w-md rounded-br-none">
+                                                <p className="text-sm" style={{ wordBreak: 'break-word' }}>{msg.content}</p>
+                                            </div>
+                                            <Badge variant="secondary" className="bg-blue-600 text-white w-8 h-8 flex items-center justify-center flex-shrink-0">{myCharacter.charAt(0)}</Badge>
+                                        </div>
+                                    </div>
+                                );
+                            } else {
+                                // Their message (left aligned)
+                                return (
+                                    <div key={index} className="flex w-full justify-start">
+                                        <div className="flex items-start gap-2.5">
+                                            <Badge variant="secondary" className="bg-slate-600 text-gray-200 w-8 h-8 flex items-center justify-center flex-shrink-0">{msg.sender.charAt(0)}</Badge>
+                                            <div className="bg-slate-700 text-gray-200 p-3 rounded-lg max-w-xs md:max-w-md rounded-bl-none">
+                                                <p className="text-sm" style={{ wordBreak: 'break-word' }}>{msg.content}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            }
+                        })}
                         <div ref={chatMessagesEndRef} />
                     </CardContent>
                     <div className="p-4 border-t border-slate-700">
