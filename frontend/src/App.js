@@ -11,11 +11,31 @@ import './App.css';
 
 // NEW: Array of fun, random error messages
 const sizeErrorMessages = [
-  "This file is too heavy for even the Hulk!",
-  "S.H.I.E.L.D. protocols limit transfers to 100MB.",
-  "My Pym Particle supply is low. Can't handle files over 100MB.",
-  "This file is too powerful! It exceeds the 100MB containment field.",
-  "Even Mjolnir isn't this heavy. Please keep files under 100MB."
+"This file is too heavy for even the Hulk!",
+"S.H.I.E.L.D. protocols limit transfers to 100MB.",
+"My Pym Particle supply is low. Can't handle files over 100MB.",
+"Even Mjolnir isn't this heavy. Please keep files under 100MB.",
+"JARVIS reports this file's data signature is too large. Keep it under 100MB.",
+"Perfectly balanced... this file is not. Must be under 100MB to maintain cosmic order.",
+"Language! That's a big file. The limit here is 100MB, soldier.",
+"Are you trying to send a whole moon? This system can't handle more than 100MB!",
+"With great file size comes great server responsibility. The 100MB limit must be respected.",
+"Even Vibranium servers have their limits. Files over 100MB cannot be processed.",
+"This file has been classified as a Level 7 threat. All transmissions must be under 100MB.",
+"Looks like you'll need some PYM particles for that file! Must be under 100MB.",
+"The bifrost can't sustain a transfer of this magnitude! Keep it under 100MB.",
+"This file's energy signature is too large for the Tesseract. Keep transfers under 100MB.",
+"This file is too heavy for a cosmic flight. It's over the 100MB weight limit.",
+"SMASH! This file is too big! Keep it under 100MB before things get... angry.",
+"This file is a Nexus event. Prune it to under 100MB to protect the Sacred Timeline.",
+"I can do this all day. But I can't upload a file over 100MB.",
+"On your left... is a smaller file, I hope. This one exceeds the 100MB limit.",
+"This file is too big. I don't feel so good... Try something under 100MB.",
+"I went forward in time to view 14,000,605 futures. In none of them does this upload succeed. (File must be under 100MB).",
+"That's my secret, Cap. I'm always angry... at files over 100MB.",
+"I love you 3000, but I don't love files over 100MB.",
+"This file is too big to fit in the Quantum Realm. Please shrink it to under 100MB.",
+"Cerebro has detected a file with a power signature that is off the charts. Max capacity is 100MB."
 ];
 
 const App = () => {
