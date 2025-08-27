@@ -55,6 +55,7 @@ const timeoutErrorMessages = [
   "JARVIS reports a network anomaly. Upload timed out."
 ];
 
+
 const App = () => {
   const [dragActive, setDragActive] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -68,6 +69,7 @@ const App = () => {
   const [connectionStatus, setConnectionStatus] = useState('disconnected');
   const [currentShare, setCurrentShare] = useState(null);
   const [showShareModal, setShowShareModal] = useState(false);
+  const [showReceiveModal, setShowReceiveModal] = useState(false);
   const [receivedShare, setReceivedShare] = useState(null);
   const [isDownloading, setIsDownloading] = useState(false);
   
@@ -143,35 +145,18 @@ const App = () => {
     }
   };
 
+  // MODIFIED: Reverted to the original modal logic
   const handleIncomingShare = (message) => {
-    const shareData = message.share_data;
-    const fromCharacter = message.from_character;
-
-    const tempReceivedShare = {
-        from_character: fromCharacter,
-        share_data: shareData
-    };
-
-    toast.message(`Incoming Share from ${fromCharacter}`, {
-      description: shareData.type === 'file' 
-        ? `File: ${shareData.filename}`
-        : `Note: ${shareData.content.substring(0, 30)}...`,
-      duration: 15000,
-      action: {
-        label: shareData.type === 'file' ? 'Download' : 'Copy',
-        onClick: () => {
-          if (shareData.type === 'file') {
-            handleDownloadFile(tempReceivedShare);
-          } else {
-            handleCopyText(tempReceivedShare);
-          }
-        },
-      },
-      cancel: {
-        label: 'Dismiss',
-        onClick: () => {},
-      },
+    toast.info(`🦸‍♂️ ${message.from_character} is sharing something with you!`);
+    
+    setReceivedShare({
+      from_character: message.from_character,
+      from_user_id: message.from_user_id,
+      share_data: message.share_data,
+      timestamp: message.timestamp
     });
+    // This now shows the central modal again
+    setShowReceiveModal(true);
   };
 
   const handleDrag = (e) => {
@@ -251,7 +236,6 @@ const App = () => {
     } finally {
       setIsUploading(false);
       setUploadProgress(0);
-      // NEW: Reset the file input after every attempt (success or fail)
       if (fileInputRef.current) {
         fileInputRef.current.value = null;
       }
@@ -323,29 +307,31 @@ const App = () => {
     }
   };
   
-  const handleCopyText = async (shareToCopy) => {
-    if (!shareToCopy?.share_data?.content) return;
+  // MODIFIED: Reverted to use state instead of an argument
+  const handleCopyText = async () => {
+    if (!receivedShare?.share_data?.content) return;
     try {
-      await navigator.clipboard.writeText(shareToCopy.share_data.content);
+      await navigator.clipboard.writeText(receivedShare.share_data.content);
       toast.success('Text copied to clipboard!');
     } catch (error) {
       toast.error('Could not copy text.');
     }
   };
 
-  const handleDownloadFile = async (shareToDownload) => {
-    if (!shareToDownload?.share_data?.file_id) return;
+  // MODIFIED: Reverted to use state instead of an argument
+  const handleDownloadFile = async () => {
+    if (!receivedShare?.share_data?.file_id) return;
     setIsDownloading(true);
     toast.info('Starting download...');
     try {
-      const response = await axios.get(`${backendUrl}/api/download/${shareToDownload.share_data.file_id}`, {
+      const response = await axios.get(`${backendUrl}/api/download/${receivedShare.share_data.file_id}`, {
         responseType: 'blob'
       });
       
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', shareToDownload.share_data.filename);
+      link.setAttribute('download', receivedShare.share_data.filename);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -358,6 +344,11 @@ const App = () => {
     } finally {
       setIsDownloading(false);
     }
+  };
+
+  const closeReceiveModal = () => {
+    setShowReceiveModal(false);
+    setReceivedShare(null);
   };
 
   const getFileIcon = (filename) => {
@@ -466,7 +457,6 @@ const App = () => {
           </CardContent>
         </Card>
 
-        {/* NEW: Restored the Share Modal JSX block */}
         {showShareModal && currentShare && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
             <Card className="bg-slate-800 border-slate-700 w-full max-w-lg">
@@ -507,6 +497,65 @@ const App = () => {
           </div>
         )}
         
+        {/* NEW: Restored the Receive Modal */}
+        {showReceiveModal && receivedShare && (
+           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+             <Card className="bg-slate-800 border-slate-700 w-full max-w-md">
+               <CardHeader>
+                 <div className="flex items-center justify-between">
+                   <CardTitle className="text-white flex items-center gap-2">
+                     <CheckCircle className="w-5 h-5 text-green-400" />
+                     {receivedShare.from_character} sent you something!
+                   </CardTitle>
+                   <Button onClick={closeReceiveModal} variant="ghost" size="sm" className="text-gray-400 hover:text-white">
+                     <X className="w-4 h-4" />
+                   </Button>
+                 </div>
+               </CardHeader>
+               <CardContent className="space-y-4">
+                 <div className="p-4 bg-slate-700/50 rounded-lg">
+                   {receivedShare.share_data.type === 'file' ? (
+                     <div className="flex items-center gap-3">
+                       <span className="text-2xl">{getFileIcon(receivedShare.share_data.filename)}</span>
+                       <div>
+                         <p className="text-white font-medium">{receivedShare.share_data.filename}</p>
+                         <p className="text-gray-400 text-sm">
+                           {receivedShare.share_data.size ? `${Math.round(receivedShare.share_data.size / 1024)} KB` : ''}
+                         </p>
+                       </div>
+                     </div>
+                   ) : (
+                     <div>
+                       <p className="text-white font-medium mb-2">{receivedShare.share_data.title}</p>
+                       <p className="text-gray-300 text-sm max-h-32 overflow-y-auto">
+                         {receivedShare.share_data.content}
+                       </p>
+                     </div>
+                   )}
+                 </div>
+                 
+                 <div className="flex gap-2">
+                   {receivedShare.share_data.type === 'file' ? (
+                     <Button onClick={handleDownloadFile} disabled={isDownloading} className="flex-1 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700">
+                       {isDownloading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}
+                       Download File
+                     </Button>
+                   ) : (
+                     <Button onClick={handleCopyText} className="flex-1 bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700">
+                       <Copy className="w-4 h-4 mr-2" />
+                       Copy Text
+                     </Button>
+                   )}
+                   
+                   <Button onClick={closeReceiveModal} variant="outline" className="border-slate-600 text-gray-300 hover:bg-slate-700">
+                     Close
+                   </Button>
+                 </div>
+               </CardContent>
+             </Card>
+           </div>
+        )}
+
       </div>
     </div>
   );
