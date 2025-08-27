@@ -1,41 +1,21 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import { Upload, Users, Send, FileText, Wifi, Loader2, Download, Copy, X, CheckCircle } from 'lucide-react';
+// MODIFIED: Added ShieldAlert for the error icon and Toaster for custom notifications
+import { Upload, Users, Send, FileText, Wifi, Loader2, Download, Copy, X, CheckCircle, ShieldAlert } from 'lucide-react'; 
+import { Toaster, toast } from 'sonner';
 import { Button } from './components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './components/ui/card';
 import { Textarea } from './components/ui/textarea';
 import { Badge } from './components/ui/badge';
 import { Progress } from './components/ui/progress';
-import { toast } from 'sonner';
 import './App.css';
 
-// NEW: Array of fun, random error messages
 const sizeErrorMessages = [
-"This file is too heavy for even the Hulk!",
-"S.H.I.E.L.D. protocols limit transfers to 100MB.",
-"My Pym Particle supply is low. Can't handle files over 100MB.",
-"Even Mjolnir isn't this heavy. Please keep files under 100MB.",
-"JARVIS reports this file's data signature is too large. Keep it under 100MB.",
-"Perfectly balanced... this file is not. Must be under 100MB to maintain cosmic order.",
-"Language! That's a big file. The limit here is 100MB, soldier.",
-"Are you trying to send a whole moon? This system can't handle more than 100MB!",
-"With great file size comes great server responsibility. The 100MB limit must be respected.",
-"Even Vibranium servers have their limits. Files over 100MB cannot be processed.",
-"This file has been classified as a Level 7 threat. All transmissions must be under 100MB.",
-"Looks like you'll need some PYM particles for that file! Must be under 100MB.",
-"The bifrost can't sustain a transfer of this magnitude! Keep it under 100MB.",
-"This file's energy signature is too large for the Tesseract. Keep transfers under 100MB.",
-"This file is too heavy for a cosmic flight. It's over the 100MB weight limit.",
-"SMASH! This file is too big! Keep it under 100MB before things get... angry.",
-"This file is a Nexus event. Prune it to under 100MB to protect the Sacred Timeline.",
-"I can do this all day. But I can't upload a file over 100MB.",
-"On your left... is a smaller file, I hope. This one exceeds the 100MB limit.",
-"This file is too big. I don't feel so good... Try something under 100MB.",
-"I went forward in time to view 14,000,605 futures. In none of them does this upload succeed.",
-"That's my secret, Cap. I'm always angry... at files over 100MB.",
-"I love you 3000, but I don't love files over 100MB.",
-"This file is too big to fit in the Quantum Realm. Please shrink it to under 100MB.",
-"Cerebro has detected a file with a power signature that is off the charts. Max capacity is 100MB."
+  "This file is too heavy for even the Hulk!",
+  "S.H.I.E.L.D. protocols limit transfers to 100MB.",
+  "My Pym Particle supply is low. Can't handle files over 100MB.",
+  "This file is too powerful! It exceeds the 100MB containment field.",
+  "Even Mjolnir isn't this heavy. Please keep files under 100MB."
 ];
 
 const App = () => {
@@ -75,7 +55,7 @@ const App = () => {
     
     ws.onopen = () => {
       setConnectionStatus('connected');
-      toast.success('🌟 Connected to FlowShare network!');
+      toast.success('Connected to FlowShare network!');
     };
     
     ws.onmessage = (event) => {
@@ -85,14 +65,14 @@ const App = () => {
     
     ws.onclose = () => {
       setConnectionStatus('disconnected');
-      toast.error('⚠️ Connection lost. Reconnecting...');
+      toast.error('Connection lost. Reconnecting...');
       setTimeout(connectWebSocket, 3000);
     };
     
     ws.onerror = (error) => {
       console.error('WebSocket error:', error);
       setConnectionStatus('error');
-      toast.error('❌ Connection error. Retrying...');
+      toast.error('Connection error. Retrying...');
     };
     
     websocketRef.current = ws;
@@ -102,7 +82,7 @@ const App = () => {
     switch (message.type) {
       case 'character_assigned':
         setMyCharacter(message.character);
-        toast.success(`🦸‍♂️ You are now ${message.character}!`);
+        toast.success(`You are now ${message.character}!`);
         break;
       
       case 'user_list_update':
@@ -115,11 +95,11 @@ const App = () => {
         break;
       
       case 'share_success':
-        toast.success(`✅ ${message.message}`);
+        toast.success(message.message);
         break;
       
       case 'share_failed':
-        toast.error(`❌ ${message.message}`);
+        toast.error(message.message);
         break;
       
       default:
@@ -128,7 +108,7 @@ const App = () => {
   };
 
   const handleIncomingShare = (message) => {
-    toast.info(`🦸‍♂️ ${message.from_character} is sharing something with you!`);
+    toast.info(`${message.from_character} is sharing something with you!`);
     
     setReceivedShare({
       from_character: message.from_character,
@@ -164,18 +144,19 @@ const App = () => {
 
     const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100 MB
     if (file.size > MAX_FILE_SIZE) {
-      // MODIFIED: Select a random message and apply custom styles
       const randomIndex = Math.floor(Math.random() * sizeErrorMessages.length);
       const randomMessage = sizeErrorMessages[randomIndex];
       
+      // MODIFIED: Added a superhero icon and removed custom styles to use the Toaster's richColors prop
       toast.error(randomMessage, {
+        icon: <ShieldAlert className="w-5 h-5" />,
         description: `Your file is ${Math.round(file.size / (1024*1024))}MB. Please keep it under 100MB.`,
-        style: {
-          background: 'hsl(240, 50%, 15%)',
-          color: '#ffffff',
-          border: '1px solid hsl(240, 30%, 30%)',
-        },
       });
+
+      // NEW: Reset the file input so the user can select another file without refreshing
+      if (fileInputRef.current) {
+        fileInputRef.current.value = null;
+      }
       return;
     }
     
@@ -197,11 +178,11 @@ const App = () => {
       setCurrentShare(response.data);
       setModalSelectedUsers(new Set(selectedUsers)); 
       setShowShareModal(true);
-      toast.success('📁 File uploaded! Now choose who to send it to.');
+      toast.success('File uploaded! Now choose who to send it to.');
       
     } catch (error) {
       const errorMessage = error.response?.data?.detail || 'Failed to upload file. Please try again.';
-      toast.error(`❌ ${errorMessage}`);
+      toast.error(errorMessage, { icon: <ShieldAlert className="w-5 h-5" /> });
       console.error('Upload error:', error);
     } finally {
       setIsUploading(false);
@@ -225,10 +206,10 @@ const App = () => {
       setModalSelectedUsers(new Set(selectedUsers));
       setShowShareModal(true);
       setTextContent('');
-      toast.success('📝 Note ready! Now choose who to send it to.');
+      toast.success('Note ready! Now choose who to send it to.');
       
     } catch (error) {
-      toast.error('❌ Failed to create text share. Please try again.');
+      toast.error('Failed to create text share. Please try again.');
       console.error('Text share error:', error);
     }
   };
@@ -270,7 +251,7 @@ const App = () => {
       setModalSelectedUsers(new Set());
       setCurrentShare(null);
     } else {
-      toast.error('❌ Connection lost. Please try again.');
+      toast.error('Connection lost. Please try again.');
     }
   };
   
@@ -278,7 +259,7 @@ const App = () => {
     if (!receivedShare?.share_data?.content) return;
     try {
       await navigator.clipboard.writeText(receivedShare.share_data.content);
-      toast.success('📋 Text copied to clipboard!');
+      toast.success('Text copied to clipboard!');
     } catch (error) {
       toast.error('Could not copy text.');
     }
@@ -301,10 +282,10 @@ const App = () => {
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
       
-      toast.success('📁 File downloaded successfully!');
+      toast.success('File downloaded successfully!');
     } catch (error) {
       console.error('Download error:', error);
-      toast.error('❌ Failed to download file. Please try again.');
+      toast.error('Failed to download file. Please try again.');
     } finally {
       setIsDownloading(false);
     }
@@ -329,13 +310,14 @@ const App = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 text-white font-sans">
+      {/* NEW: Add the Toaster component here for rich, animated notifications */}
+      <Toaster richColors position="top-center" theme="dark" />
       <div className="container mx-auto px-4 py-8 max-w-4xl">
         {/* Header */}
         <div className="text-center mb-12">
           <h1 className="text-6xl font-bold bg-gradient-to-r from-red-400 via-yellow-400 to-blue-400 bg-clip-text text-transparent mb-4">
             FlowShare
           </h1>
-          {/* MODIFIED: Removed "P2P" */}
           <p className="text-gray-300 text-xl">Marvel Share Network</p>
           
           {myCharacter && (
