@@ -122,7 +122,6 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
     async with AsyncSessionLocal() as session:
         yield session
 
-# ... [Your MARVEL_CHARACTERS list and ConnectionManager class remain the same] ...
 # Marvel characters list
 MARVEL_CHARACTERS = [
     "Iron Man", "Captain America", "Thor", "Hulk", "Black Widow", "Hawkeye",
@@ -136,7 +135,6 @@ MARVEL_CHARACTERS = [
 
 # Active WebSocket connections and user sessions
 class ConnectionManager:
-    # ... [Paste your existing ConnectionManager class code here, it does not need changes] ...
     def __init__(self):
         self.active_connections: Dict[str, WebSocket] = {}
         self.user_sessions: Dict[str, dict] = {}
@@ -230,7 +228,6 @@ manager = ConnectionManager()
 UPLOAD_DIR = Path("/tmp/flowshare_files")
 UPLOAD_DIR.mkdir(exist_ok=True)
 
-# ... [Your websocket endpoints and other routes] ...
 @app.websocket("/api/ws/{user_id}")
 async def websocket_endpoint(websocket: WebSocket, user_id: str):
     await manager.connect(websocket, user_id)
@@ -274,7 +271,8 @@ async def upload_file(file: UploadFile = File(...), db: AsyncSession = Depends(g
             content_type=file.content_type,
             size=file.size,
             file_path=str(file_path),
-            expires_at=datetime.utcnow() + timedelta(hours=24)
+            # --- MODIFIED: Expiration time changed to 9 minutes ---
+            expires_at=datetime.utcnow() + timedelta(minutes=9)
         )
         db.add(new_file)
         await db.commit()
@@ -288,7 +286,6 @@ async def upload_file(file: UploadFile = File(...), db: AsyncSession = Depends(g
             raise e
         raise HTTPException(status_code=500, detail=str(e))
 
-# ... [The rest of your endpoints: download, create_text_share, etc. remain the same] ...
 @app.get("/api/download/{file_id}")
 async def download_file(file_id: str, db: AsyncSession = Depends(get_db)):
     try:
@@ -320,7 +317,8 @@ async def create_text_share(data: dict, db: AsyncSession = Depends(get_db)):
             share_id=share_id,
             content=data.get("content", ""),
             title=data.get("title", "Shared Note"),
-            expires_at=datetime.utcnow() + timedelta(hours=24)
+            # --- MODIFIED: Expiration time changed to 9 minutes ---
+            expires_at=datetime.utcnow() + timedelta(minutes=9)
         )
         db.add(new_text_share)
         await db.commit()
