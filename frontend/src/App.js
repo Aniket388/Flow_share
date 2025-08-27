@@ -40,7 +40,7 @@ const App = () => {
   }, []);
 
   const connectWebSocket = () => {
-    const wsUrl = backendUrl.replace('http', 'ws') + `/api/ws/${userId}`;
+    const wsUrl = backendUrl.replace(/http/g, 'ws') + `/api/ws/${userId}`;
     const ws = new WebSocket(wsUrl);
     
     ws.onopen = () => {
@@ -111,7 +111,7 @@ const App = () => {
     const fromCharacter = message.from_character;
     
     // Show immediate notification
-    toast.success(`🦸‍♂️ ${fromCharacter} is sharing ${shareType === 'file' ? 'a file' : 'a note'} with you!`);
+    toast.info(`🦸‍♂️ ${fromCharacter} is sharing ${shareType === 'file' ? 'a file' : 'a note'} with you!`);
     
     // Set received share data and show modal
     setReceivedShare({
@@ -153,8 +153,18 @@ const App = () => {
     }
   };
 
+  // --- MODIFIED: Added file size check ---
   const handleFileUpload = async (file) => {
     if (!file) return;
+
+    // Check file size before starting the upload
+    const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100 MB
+    if (file.size > MAX_FILE_SIZE) {
+      toast.error("This file is too heavy for even the Hulk!", {
+        description: `Your file is ${Math.round(file.size / (1024*1024))}MB. Please keep it under 100MB.`,
+      });
+      return; // Stop the function here
+    }
     
     setIsUploading(true);
     setUploadProgress(0);
@@ -178,13 +188,16 @@ const App = () => {
       toast.success('📁 File uploaded successfully!');
       
     } catch (error) {
-      toast.error('❌ Failed to upload file. Please try again.');
+      // Use the error message from the backend if it exists
+      const errorMessage = error.response?.data?.detail || 'Failed to upload file. Please try again.';
+      toast.error(`❌ ${errorMessage}`);
       console.error('Upload error:', error);
     } finally {
       setIsUploading(false);
       setUploadProgress(0);
     }
   };
+  // --- END MODIFIED ---
 
   const handleTextShare = async () => {
     if (!textContent.trim()) {
@@ -247,14 +260,7 @@ const App = () => {
       await navigator.clipboard.writeText(receivedShare.share_data.content);
       toast.success('📋 Text copied to clipboard!');
     } catch (error) {
-      // Fallback for older browsers
-      const textArea = document.createElement('textarea');
-      textArea.value = receivedShare.share_data.content;
-      document.body.appendChild(textArea);
-      textArea.select();
-      document.execCommand('copy');
-      document.body.removeChild(textArea);
-      toast.success('📋 Text copied to clipboard!');
+      toast.error('Could not copy text.');
     }
   };
 
@@ -268,7 +274,6 @@ const App = () => {
         responseType: 'blob'
       });
       
-      // Create download link
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = url;
@@ -295,29 +300,17 @@ const App = () => {
   const getFileIcon = (filename) => {
     const extension = filename?.split('.').pop()?.toLowerCase();
     switch (extension) {
-      case 'pdf':
-        return '📄';
-      case 'doc':
-      case 'docx':
-        return '📝';
-      case 'jpg':
-      case 'jpeg':
-      case 'png':
-      case 'gif':
-        return '🖼️';
-      case 'mp4':
-      case 'avi':
-        return '🎥';
-      case 'mp3':
-      case 'wav':
-        return '🎵';
-      default:
-        return '📁';
+      case 'pdf': return '📄';
+      case 'doc': case 'docx': return '📝';
+      case 'jpg': case 'jpeg': case 'png': case 'gif': return '🖼️';
+      case 'mp4': case 'avi': case 'mov': return '🎥';
+      case 'mp3': case 'wav': return '🎵';
+      default: return '📁';
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 text-white font-sans">
       <div className="container mx-auto px-4 py-8 max-w-4xl">
         {/* Header */}
         <div className="text-center mb-12">
