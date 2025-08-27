@@ -169,10 +169,9 @@ class ConnectionManager:
         await self.broadcast_user_list()
 
     def disconnect(self, user_id: str):
-        if user_id in self.active_connections:
-            del self.active_connections[user_id]
-        if user_id in self.user_sessions:
-            del self.user_sessions[user_id]
+        if user_id in self.active_connections: del self.active_connections[user_id]
+        if user_id in self.user_sessions: del self.user_sessions[user_id]
+        # No need to await broadcast here, as the main loop will handle it on exception
 
     async def send_personal_message(self, user_id: str, message: dict):
         if user_id in self.active_connections:
@@ -185,24 +184,13 @@ class ConnectionManager:
         user_list = [{'user_id': user_id, 'character': session['character']} for user_id, session in self.user_sessions.items()]
         message = {'type': 'user_list_update', 'users': user_list}
         
-        disconnected_users = []
-        for user_id, websocket in self.active_connections.items():
+        # Create a list of connections to iterate over, to avoid issues if the dict changes during iteration
+        connections = list(self.active_connections.items())
+        for user_id, websocket in connections:
             try:
                 await websocket.send_text(json.dumps(message))
             except:
-                disconnected_users.append(user_id)
-        
-        for user_id in disconnected_users:
-            self.disconnect(user_id)
-
-    async def send_webrtc_signal(self, from_user_id: str, to_user_id: str, signal_data: dict):
-        message = {
-            'type': 'webrtc_signal',
-            'from_user_id': from_user_id,
-            'from_character': self.user_sessions.get(from_user_id, {}).get('character', 'Unknown'),
-            'signal_data': signal_data
-        }
-        await self.send_personal_message(to_user_id, message)
+                self.disconnect(user_id)
 
     async def send_share_notification(self, from_user_id: str, to_user_ids: List[str], share_data: dict):
         from_character = self.user_sessions.get(from_user_id, {}).get('character', 'Unknown')
@@ -216,11 +204,9 @@ class ConnectionManager:
         
         success_count = 0
         for to_user_id in to_user_ids:
-            try:
+            if to_user_id in self.active_connections:
                 await self.send_personal_message(to_user_id, message)
                 success_count += 1
-            except Exception as e:
-                print(f"Failed to send to {to_user_id}: {str(e)}")
         
         if success_count > 0:
             await self.send_personal_message(from_user_id, {
@@ -228,6 +214,23 @@ class ConnectionManager:
                 'message': f'Successfully shared with {success_count} Marvel hero{"s" if success_count > 1 else ""}!',
                 'success_count': success_count
             })
+
+    # NEW: Function to handle sending private messages
+    async def send_private_message(self, from_user_id: str, to_user_id: str, content: str):
+        from_character = self.user_sessions.get(from_user_id, {}).get('character', 'Unknown')
+        message = {
+            'type': 'private_message',
+            'from_user_id': from_user_id,
+            'from_character': from_character,
+            'content': content,
+            'timestamp': datetime.utcnow().isoformat()
+        }
+        # Send the message to the recipient
+        if to_user_id in self.active_connections:
+            await self.send_personal_message(to_user_id, message)
+        # Send a copy back to the sender so it appears in their chat window
+        if from_user_id in self.active_connections:
+            await self.send_personal_message(from_user_id, message)
 
 manager = ConnectionManager()
 UPLOAD_DIR = Path("/tmp/flowshare_files")
@@ -241,24 +244,27 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str):
             data = await websocket.receive_text()
             message = json.loads(data)
             
-            if message['type'] == 'webrtc_signal':
-                await manager.send_webrtc_signal(user_id, message['to_user_id'], message['signal_data'])
-            elif message['type'] == 'share_notification':
+            if message['type'] == 'share_notification':
                 await manager.send_share_notification(user_id, message['to_user_ids'], message['share_data'])
+            # NEW: Handle incoming private messages
+            elif message['type'] == 'private_message':
+                await manager.send_private_message(user_id, message['to_user_id'], message['content'])
     except WebSocketDisconnect:
+        pass # The finally block will handle cleanup
+    finally:
         manager.disconnect(user_id)
         await manager.broadcast_user_list()
 
-@app.get("/api/health")
+@app.api_route("/api/health", methods=["GET", "HEAD"])
 async def health_check():
-    return {"status": "healthy", "service": "FlowShare P2P"}
+    return {"status": "healthy", "service": "FlowShare"}
 
 @app.post("/api/upload")
 async def upload_file(file: UploadFile = File(...), db: AsyncSession = Depends(get_db)):
     try:
         MAX_FILE_SIZE = 100 * 1024 * 1024
         if file.size and file.size > MAX_FILE_SIZE:
-            raise HTTPException(status_code=413, detail=f"File is too large ({round(file.size / (1024*1024), 2)} MB). Maximum size is 100MB.")
+            raise HTTPException(status_code=413, detail=f"File is too large. Maximum size is 100MB.")
 
         file_id = str(uuid.uuid4())
         file_path = UPLOAD_DIR / f"{file_id}_{file.filename}"
@@ -266,11 +272,8 @@ async def upload_file(file: UploadFile = File(...), db: AsyncSession = Depends(g
             shutil.copyfileobj(file.file, buffer)
         
         new_file = FileStorage(
-            file_id=file_id,
-            filename=file.filename,
-            content_type=file.content_type,
-            size=file.size,
-            file_path=str(file_path),
+            file_id=file_id, filename=file.filename, content_type=file.content_type,
+            size=file.size, file_path=str(file_path),
             expires_at=datetime.utcnow() + timedelta(minutes=30)
         )
         db.add(new_file)
@@ -306,8 +309,7 @@ async def create_text_share(data: dict, db: AsyncSession = Depends(get_db)):
         share_id = str(uuid.uuid4())
         
         new_text_share = TextShare(
-            share_id=share_id,
-            content=data.get("content", ""),
+            share_id=share_id, content=data.get("content", ""),
             title=data.get("title", "Shared Note"),
             expires_at=datetime.utcnow() + timedelta(minutes=30)
         )
