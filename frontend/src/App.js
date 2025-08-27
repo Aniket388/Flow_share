@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import { Upload, Users, Send, FileText, Wifi, Loader2, Download, Copy, X, CheckCircle, AlertCircle } from 'lucide-react';
+import { Upload, Users, Send, FileText, Wifi, Loader2, Download, Copy, X, CheckCircle } from 'lucide-react';
 import { Button } from './components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './components/ui/card';
 import { Textarea } from './components/ui/textarea';
@@ -15,7 +15,9 @@ const App = () => {
   const [isUploading, setIsUploading] = useState(false);
   const [textContent, setTextContent] = useState('');
   const [connectedUsers, setConnectedUsers] = useState([]);
-  const [selectedUsers, setSelectedUsers] = useState(new Set());
+  // NEW: Re-introduced main selection state for pre-selection
+  const [selectedUsers, setSelectedUsers] = useState(new Set()); 
+  const [modalSelectedUsers, setModalSelectedUsers] = useState(new Set());
   const [myCharacter, setMyCharacter] = useState('');
   const [userId] = useState(() => `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
   const [connectionStatus, setConnectionStatus] = useState('disconnected');
@@ -56,7 +58,7 @@ const App = () => {
     ws.onclose = () => {
       setConnectionStatus('disconnected');
       toast.error('⚠️ Connection lost. Reconnecting...');
-      setTimeout(connectWebSocket, 3000); // Reconnect after 3 seconds
+      setTimeout(connectWebSocket, 3000);
     };
     
     ws.onerror = (error) => {
@@ -80,10 +82,6 @@ const App = () => {
         setConnectedUsers(otherUsers);
         break;
       
-      case 'webrtc_signal':
-        handleWebRTCSignal(message);
-        break;
-      
       case 'incoming_share':
         handleIncomingShare(message);
         break;
@@ -101,36 +99,16 @@ const App = () => {
     }
   };
 
-  const handleWebRTCSignal = (message) => {
-    // WebRTC signaling logic will be implemented here
-    console.log('Received WebRTC signal from', message.from_character);
-  };
-
   const handleIncomingShare = (message) => {
-    const shareType = message.share_data.type;
-    const fromCharacter = message.from_character;
+    toast.info(`🦸‍♂️ ${message.from_character} is sharing something with you!`);
     
-    // Show immediate notification
-    toast.info(`🦸‍♂️ ${fromCharacter} is sharing ${shareType === 'file' ? 'a file' : 'a note'} with you!`);
-    
-    // Set received share data and show modal
     setReceivedShare({
-      from_character: fromCharacter,
+      from_character: message.from_character,
       from_user_id: message.from_user_id,
       share_data: message.share_data,
       timestamp: message.timestamp
     });
     setShowReceiveModal(true);
-  };
-
-  const sendWebRTCSignal = (toUserId, signalData) => {
-    if (websocketRef.current && websocketRef.current.readyState === WebSocket.OPEN) {
-      websocketRef.current.send(JSON.stringify({
-        type: 'webrtc_signal',
-        to_user_id: toUserId,
-        signal_data: signalData
-      }));
-    }
   };
 
   const handleDrag = (e) => {
@@ -153,17 +131,15 @@ const App = () => {
     }
   };
 
-  // --- MODIFIED: Added file size check ---
   const handleFileUpload = async (file) => {
     if (!file) return;
 
-    // Check file size before starting the upload
     const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100 MB
     if (file.size > MAX_FILE_SIZE) {
       toast.error("This file is too heavy for even the Hulk!", {
         description: `Your file is ${Math.round(file.size / (1024*1024))}MB. Please keep it under 100MB.`,
       });
-      return; // Stop the function here
+      return;
     }
     
     setIsUploading(true);
@@ -174,9 +150,7 @@ const App = () => {
       formData.append('file', file);
       
       const response = await axios.post(`${backendUrl}/api/upload`, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
+        headers: { 'Content-Type': 'multipart/form-data' },
         onUploadProgress: (progressEvent) => {
           const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total);
           setUploadProgress(progress);
@@ -184,11 +158,12 @@ const App = () => {
       });
       
       setCurrentShare(response.data);
+      // NEW: Sync main selections with the modal's selections
+      setModalSelectedUsers(new Set(selectedUsers)); 
       setShowShareModal(true);
-      toast.success('📁 File uploaded successfully!');
+      toast.success('📁 File uploaded successfully! Now choose who to send it to.');
       
     } catch (error) {
-      // Use the error message from the backend if it exists
       const errorMessage = error.response?.data?.detail || 'Failed to upload file. Please try again.';
       toast.error(`❌ ${errorMessage}`);
       console.error('Upload error:', error);
@@ -197,7 +172,6 @@ const App = () => {
       setUploadProgress(0);
     }
   };
-  // --- END MODIFIED ---
 
   const handleTextShare = async () => {
     if (!textContent.trim()) {
@@ -212,9 +186,11 @@ const App = () => {
       });
       
       setCurrentShare(response.data);
+      // NEW: Sync main selections with the modal's selections
+      setModalSelectedUsers(new Set(selectedUsers));
       setShowShareModal(true);
       setTextContent('');
-      toast.success('📝 Text note ready to share!');
+      toast.success('📝 Text note ready to share! Now choose who to send it to.');
       
     } catch (error) {
       toast.error('❌ Failed to create text share. Please try again.');
@@ -222,6 +198,7 @@ const App = () => {
     }
   };
 
+  // NEW: Handler for the main page (pre-selection)
   const toggleUserSelection = (user) => {
     const newSelection = new Set(selectedUsers);
     if (newSelection.has(user.user_id)) {
@@ -232,8 +209,19 @@ const App = () => {
     setSelectedUsers(newSelection);
   };
 
+  // Handler for inside the modal
+  const toggleModalUserSelection = (user) => {
+    const newSelection = new Set(modalSelectedUsers);
+    if (newSelection.has(user.user_id)) {
+      newSelection.delete(user.user_id);
+    } else {
+      newSelection.add(user.user_id);
+    }
+    setModalSelectedUsers(newSelection);
+  };
+
   const handleShareNow = () => {
-    if (selectedUsers.size === 0) {
+    if (modalSelectedUsers.size === 0) {
       toast.error('Please select at least one hero to share with.');
       return;
     }
@@ -241,21 +229,20 @@ const App = () => {
     if (websocketRef.current && websocketRef.current.readyState === WebSocket.OPEN) {
       websocketRef.current.send(JSON.stringify({
         type: 'share_notification',
-        to_user_ids: Array.from(selectedUsers),
+        to_user_ids: Array.from(modalSelectedUsers),
         share_data: currentShare
       }));
       
       setShowShareModal(false);
-      setSelectedUsers(new Set());
+      setModalSelectedUsers(new Set());
       setCurrentShare(null);
     } else {
       toast.error('❌ Connection lost. Please try again.');
     }
   };
-
+  
   const handleCopyText = async () => {
     if (!receivedShare?.share_data?.content) return;
-    
     try {
       await navigator.clipboard.writeText(receivedShare.share_data.content);
       toast.success('📋 Text copied to clipboard!');
@@ -266,9 +253,7 @@ const App = () => {
 
   const handleDownloadFile = async () => {
     if (!receivedShare?.share_data?.file_id) return;
-    
     setIsDownloading(true);
-    
     try {
       const response = await axios.get(`${backendUrl}/api/download/${receivedShare.share_data.file_id}`, {
         responseType: 'blob'
@@ -319,7 +304,6 @@ const App = () => {
           </h1>
           <p className="text-gray-300 text-xl">P2P Marvel Share Network</p>
           
-          {/* Your Character Identity */}
           {myCharacter && (
             <div className="mt-6 p-4 bg-gradient-to-r from-blue-600/20 to-purple-600/20 rounded-lg border border-blue-500/30">
               <h2 className="text-3xl font-bold text-white mb-2">
@@ -329,13 +313,10 @@ const App = () => {
             </div>
           )}
           
-          {/* Connection Status */}
           <div className="flex items-center justify-center gap-2 mt-4">
             <Wifi className={`w-5 h-5 ${connectionStatus === 'connected' ? 'text-green-400' : 'text-red-400'}`} />
             <span className={`text-sm ${connectionStatus === 'connected' ? 'text-green-400' : 'text-red-400'}`}>
-              {connectionStatus === 'connected' 
-                ? `Connected to network` 
-                : 'Connecting to network...'}
+              {connectionStatus === 'connected' ? `Connected to network` : 'Connecting...'}
             </span>
           </div>
         </div>
@@ -344,23 +325,11 @@ const App = () => {
         <div className="grid md:grid-cols-2 gap-8">
           {/* File Upload Section */}
           <Card className="bg-slate-800/50 border-slate-700 backdrop-blur-sm">
-            <CardHeader>
-              <CardTitle className="text-white flex items-center gap-2">
-                <Upload className="w-5 h-5" />
-                Share a File
-              </CardTitle>
-            </CardHeader>
+            <CardHeader><CardTitle className="text-white flex items-center gap-2"><Upload className="w-5 h-5" /> Share a File</CardTitle></CardHeader>
             <CardContent>
               <div
-                className={`border-2 border-dashed rounded-lg p-8 text-center transition-all duration-300 cursor-pointer ${
-                  dragActive
-                    ? 'border-blue-400 bg-blue-400/10'
-                    : 'border-slate-600 hover:border-slate-500'
-                }`}
-                onDragEnter={handleDrag}
-                onDragLeave={handleDrag}
-                onDragOver={handleDrag}
-                onDrop={handleDrop}
+                className={`border-2 border-dashed rounded-lg p-8 text-center transition-all duration-300 cursor-pointer ${dragActive ? 'border-blue-400 bg-blue-400/10' : 'border-slate-600 hover:border-slate-500'}`}
+                onDragEnter={handleDrag} onDragLeave={handleDrag} onDragOver={handleDrag} onDrop={handleDrop}
                 onClick={() => fileInputRef.current?.click()}
               >
                 {isUploading ? (
@@ -377,24 +346,13 @@ const App = () => {
                   </>
                 )}
               </div>
-              
-              <input
-                ref={fileInputRef}
-                type="file"
-                className="hidden"
-                onChange={(e) => e.target.files && handleFileUpload(e.target.files[0])}
-              />
+              <input ref={fileInputRef} type="file" className="hidden" onChange={(e) => e.target.files && handleFileUpload(e.target.files[0])} />
             </CardContent>
           </Card>
 
           {/* Text Share Section */}
           <Card className="bg-slate-800/50 border-slate-700 backdrop-blur-sm">
-            <CardHeader>
-              <CardTitle className="text-white flex items-center gap-2">
-                <FileText className="w-5 h-5" />
-                Share a Note
-              </CardTitle>
-            </CardHeader>
+            <CardHeader><CardTitle className="text-white flex items-center gap-2"><FileText className="w-5 h-5" /> Share a Note</CardTitle></CardHeader>
             <CardContent className="space-y-4">
               <Textarea
                 placeholder="Type your message or paste text here..."
@@ -402,30 +360,25 @@ const App = () => {
                 onChange={(e) => setTextContent(e.target.value)}
                 className="min-h-[120px] bg-slate-700/50 border-slate-600 text-white placeholder-gray-400"
               />
-              <Button 
-                onClick={handleTextShare}
-                disabled={!textContent.trim()}
-                className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
-              >
-                <FileText className="w-4 h-4 mr-2" />
-                Share Note
+              <Button onClick={handleTextShare} disabled={!textContent.trim()} className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700">
+                <FileText className="w-4 h-4 mr-2" /> Share Note
               </Button>
             </CardContent>
           </Card>
         </div>
 
-        {/* Connected Users */}
+        {/* NEW: Connected Users list is back on the main page for pre-selection */}
         <Card className="mt-8 bg-slate-800/50 border-slate-700 backdrop-blur-sm">
           <CardHeader>
             <CardTitle className="text-white flex items-center gap-2">
               <Users className="w-5 h-5" />
-              Available Marvel Heroes ({connectedUsers.length})
+              Pre-select Heroes ({selectedUsers.size} selected)
             </CardTitle>
           </CardHeader>
           <CardContent>
             {connectedUsers.length === 0 ? (
               <p className="text-gray-400 text-center py-8">
-                No other heroes online. Share the FlowShare link with friends to get started!
+                No other heroes online to select.
               </p>
             ) : (
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
@@ -458,33 +411,57 @@ const App = () => {
 
         {/* Share Modal */}
         {showShareModal && currentShare && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-            <Card className="bg-slate-800 border-slate-700 w-full max-w-md">
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+            <Card className="bg-slate-800 border-slate-700 w-full max-w-lg">
               <CardHeader>
-                <CardTitle className="text-white">
-                  Ready to Share {currentShare.type === 'file' ? 'File' : 'Note'}
-                </CardTitle>
+                <div className="flex justify-between items-center">
+                    <CardTitle className="text-white">Share Your {currentShare.type === 'file' ? 'File' : 'Note'}</CardTitle>
+                    <Button onClick={() => setShowShareModal(false)} variant="ghost" size="sm" className="text-gray-400 hover:text-white">
+                        <X className="w-4 h-4" />
+                    </Button>
+                </div>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="p-4 bg-slate-700/50 rounded-lg">
-                  <p className="text-white font-medium">
+                  <p className="text-white font-medium truncate">
                     {currentShare.type === 'file' ? currentShare.filename : currentShare.title}
                   </p>
-                  {currentShare.type === 'text' && (
-                    <p className="text-gray-400 text-sm mt-2">
-                      {currentShare.content.substring(0, 100)}...
-                    </p>
-                  )}
                 </div>
                 
-                <p className="text-gray-300 text-sm">
-                  Selected: {selectedUsers.size} hero{selectedUsers.size !== 1 ? 's' : ''}
+                <div className="space-y-2">
+                    <h3 className="text-white font-semibold flex items-center gap-2">
+                        <Users className="w-5 h-5" />
+                        Confirm or Change Recipients
+                    </h3>
+                    {connectedUsers.length === 0 ? (
+                        <p className="text-gray-400 text-center py-4">No other heroes are online to share with.</p>
+                    ) : (
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-2 max-h-48 overflow-y-auto p-1">
+                            {connectedUsers.map((user) => (
+                            <div
+                                key={user.user_id}
+                                className={`p-2 rounded-lg border text-center cursor-pointer transition-all duration-200 ${
+                                modalSelectedUsers.has(user.user_id)
+                                    ? 'border-blue-400 bg-blue-400/20 text-white'
+                                    : 'border-slate-600 hover:border-slate-500 bg-slate-700/50 text-gray-300'
+                                }`}
+                                onClick={() => toggleModalUserSelection(user)}
+                            >
+                                {user.character}
+                            </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                <p className="text-gray-300 text-sm pt-2">
+                  Final selection: {modalSelectedUsers.size} hero{modalSelectedUsers.size !== 1 ? 's' : ''}
                 </p>
                 
                 <div className="flex gap-2">
                   <Button
                     onClick={handleShareNow}
-                    disabled={selectedUsers.size === 0}
+                    disabled={modalSelectedUsers.size === 0}
                     className="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700"
                   >
                     <Send className="w-4 h-4 mr-2" />
@@ -505,81 +482,61 @@ const App = () => {
 
         {/* Receive Modal */}
         {showReceiveModal && receivedShare && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-            <Card className="bg-slate-800 border-slate-700 w-full max-w-md">
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-white flex items-center gap-2">
-                    <CheckCircle className="w-5 h-5 text-green-400" />
-                    {receivedShare.from_character} sent you something!
-                  </CardTitle>
-                  <Button
-                    onClick={closeReceiveModal}
-                    variant="ghost"
-                    size="sm"
-                    className="text-gray-400 hover:text-white"
-                  >
-                    <X className="w-4 h-4" />
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="p-4 bg-slate-700/50 rounded-lg">
-                  {receivedShare.share_data.type === 'file' ? (
-                    <div className="flex items-center gap-3">
-                      <span className="text-2xl">{getFileIcon(receivedShare.share_data.filename)}</span>
-                      <div>
-                        <p className="text-white font-medium">{receivedShare.share_data.filename}</p>
-                        <p className="text-gray-400 text-sm">
-                          {Math.round(receivedShare.share_data.size / 1024)} KB
-                        </p>
-                      </div>
-                    </div>
-                  ) : (
-                    <div>
-                      <p className="text-white font-medium mb-2">{receivedShare.share_data.title}</p>
-                      <p className="text-gray-300 text-sm max-h-32 overflow-y-auto">
-                        {receivedShare.share_data.content}
-                      </p>
-                    </div>
-                  )}
-                </div>
-                
-                <div className="flex gap-2">
-                  {receivedShare.share_data.type === 'file' ? (
-                    <Button
-                      onClick={handleDownloadFile}
-                      disabled={isDownloading}
-                      className="flex-1 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700"
-                    >
-                      {isDownloading ? (
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      ) : (
-                        <Download className="w-4 h-4 mr-2" />
-                      )}
-                      Download File
-                    </Button>
-                  ) : (
-                    <Button
-                      onClick={handleCopyText}
-                      className="flex-1 bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700"
-                    >
-                      <Copy className="w-4 h-4 mr-2" />
-                      Copy Text
-                    </Button>
-                  )}
-                  
-                  <Button
-                    onClick={closeReceiveModal}
-                    variant="outline"
-                    className="border-slate-600 text-gray-300 hover:bg-slate-700"
-                  >
-                    Close
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+             <Card className="bg-slate-800 border-slate-700 w-full max-w-md">
+               <CardHeader>
+                 <div className="flex items-center justify-between">
+                   <CardTitle className="text-white flex items-center gap-2">
+                     <CheckCircle className="w-5 h-5 text-green-400" />
+                     {receivedShare.from_character} sent you something!
+                   </CardTitle>
+                   <Button onClick={closeReceiveModal} variant="ghost" size="sm" className="text-gray-400 hover:text-white">
+                     <X className="w-4 h-4" />
+                   </Button>
+                 </div>
+               </CardHeader>
+               <CardContent className="space-y-4">
+                 <div className="p-4 bg-slate-700/50 rounded-lg">
+                   {receivedShare.share_data.type === 'file' ? (
+                     <div className="flex items-center gap-3">
+                       <span className="text-2xl">{getFileIcon(receivedShare.share_data.filename)}</span>
+                       <div>
+                         <p className="text-white font-medium">{receivedShare.share_data.filename}</p>
+                         <p className="text-gray-400 text-sm">
+                           {Math.round(receivedShare.share_data.size / 1024)} KB
+                         </p>
+                       </div>
+                     </div>
+                   ) : (
+                     <div>
+                       <p className="text-white font-medium mb-2">{receivedShare.share_data.title}</p>
+                       <p className="text-gray-300 text-sm max-h-32 overflow-y-auto">
+                         {receivedShare.share_data.content}
+                       </p>
+                     </div>
+                   )}
+                 </div>
+                 
+                 <div className="flex gap-2">
+                   {receivedShare.share_data.type === 'file' ? (
+                     <Button onClick={handleDownloadFile} disabled={isDownloading} className="flex-1 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700">
+                       {isDownloading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}
+                       Download File
+                     </Button>
+                   ) : (
+                     <Button onClick={handleCopyText} className="flex-1 bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700">
+                       <Copy className="w-4 h-4 mr-2" />
+                       Copy Text
+                     </Button>
+                   )}
+                   
+                   <Button onClick={closeReceiveModal} variant="outline" className="border-slate-600 text-gray-300 hover:bg-slate-700">
+                     Close
+                   </Button>
+                 </div>
+               </CardContent>
+             </Card>
+           </div>
         )}
       </div>
     </div>
