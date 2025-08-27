@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import { Upload, Users, Send, FileText, Wifi, Loader2, Download, Copy, X, CheckCircle, ShieldAlert, WifiOff, MessageSquare } from 'lucide-react'; 
+import { Upload, Users, Send, FileText, Wifi, Loader2, Download, Copy, X, CheckCircle, ShieldAlert, WifiOff, MessageSquare } from 'lucide-react';
 import { Toaster, toast } from 'sonner';
 import { Button } from './components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './components/ui/card';
@@ -339,19 +339,19 @@ const App = () => {
                 <Card className="bg-slate-800 border-slate-700 w-full max-w-lg h-[70vh] flex flex-col">
                     <CardHeader><div className="flex justify-between items-center"><CardTitle className="text-white flex items-center gap-2"><MessageSquare className="w-5 h-5 text-blue-400" />Chat with {activeChatUser.character}</CardTitle><Button onClick={() => setActiveChatUser(null)} variant="ghost" size="sm" className="text-gray-400 hover:text-white"><X className="w-4 h-4" /></Button></div></CardHeader>
                     <CardContent className="flex-1 overflow-y-auto p-4 space-y-4">
-                        {/* MODIFIED: This is the new, corrected chat bubble logic */}
+                        {/* CORRECTED: Chat message alignment logic */}
                         {(chats[activeChatUser.user_id] || []).map((msg, index) => (
-                            <div key={index} className={`flex w-full items-end gap-2 ${msg.sender === myCharacter ? 'justify-end' : 'justify-start'}`}>
-                                {msg.sender !== myCharacter && (
-                                    <Badge variant="secondary" className="bg-slate-600 text-gray-200 w-8 h-8 flex items-center justify-center self-start flex-shrink-0">{msg.sender.charAt(0)}</Badge>
-                                )}
-                                <div className={`max-w-xs md:max-w-md p-3 rounded-lg ${msg.sender === myCharacter ? 'bg-blue-600 text-white' : 'bg-slate-700 text-gray-200'}`}>
-                                    <p className="text-sm" style={{ wordBreak: 'break-word' }}>{msg.content}</p>
-                                </div>
-                                {msg.sender === myCharacter && (
-                                    <Badge variant="secondary" className="bg-blue-600 text-white w-8 h-8 flex items-center justify-center self-start flex-shrink-0">{myCharacter.charAt(0)}</Badge>
-                                )}
+                          <div key={index} className={`flex w-full items-start gap-2.5 ${msg.sender === myCharacter ? 'justify-end' : 'justify-start'}`}>
+                            {msg.sender !== myCharacter && (
+                                <Badge variant="secondary" className="bg-slate-600 text-gray-200 w-8 h-8 flex items-center justify-center flex-shrink-0">{msg.sender.charAt(0)}</Badge>
+                            )}
+                            <div className={`p-3 rounded-lg max-w-xs md:max-w-md ${msg.sender === myCharacter ? 'bg-blue-600 text-white rounded-br-none' : 'bg-slate-700 text-gray-200 rounded-bl-none'}`}>
+                                <p className="text-sm" style={{ wordBreak: 'break-word' }}>{msg.content}</p>
                             </div>
+                            {msg.sender === myCharacter && (
+                                <Badge variant="secondary" className="bg-blue-600 text-white w-8 h-8 flex items-center justify-center flex-shrink-0">{myCharacter.charAt(0)}</Badge>
+                            )}
+                          </div>
                         ))}
                         <div ref={chatMessagesEndRef} />
                     </CardContent>
