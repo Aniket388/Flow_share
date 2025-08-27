@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 from typing import Dict, List, AsyncGenerator
 import shutil
 from pathlib import Path
+import asyncio  # Import asyncio
 
 # --- SQLAlchemy Imports ---
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
@@ -29,21 +30,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# --- MODIFIED: SQLAlchemy Database Setup with URL Fix ---
+# --- SQLAlchemy Database Setup with URL Fix ---
 DATABASE_URL = os.environ.get("DATABASE_URL")
 
-# Render's database URL uses "postgresql://", but SQLAlchemy's async engine needs "postgresql+asyncpg://"
-# We'll replace the scheme to make it compatible.
 if DATABASE_URL and DATABASE_URL.startswith("postgresql://"):
     DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://", 1)
 
 engine = create_async_engine(DATABASE_URL)
 AsyncSessionLocal = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 Base = declarative_base()
-# --- END MODIFIED ---
 
-
-# --- Define database table models ---
+# --- Database table models ---
 class FileStorage(Base):
     __tablename__ = "files"
     id = Column(Integer, primary_key=True)
@@ -63,23 +60,69 @@ class TextShare(Base):
     content = Column(Text)
     created_at = Column(DateTime, default=datetime.utcnow)
     expires_at = Column(DateTime)
+    
+# --- NEW: Background Cleanup Task ---
+async def cleanup_expired_data():
+    """
+    A background task that runs every 10 minutes to clean up expired data.
+    """
+    while True:
+        await asyncio.sleep(600)  # Sleep for 10 minutes (600 seconds)
+        print("Running scheduled cleanup of expired data...")
+        
+        async with AsyncSessionLocal() as db:
+            try:
+                now = datetime.utcnow()
+                
+                # Find and delete expired files
+                expired_files_query = select(FileStorage).where(FileStorage.expires_at < now)
+                result_files = await db.execute(expired_files_query)
+                expired_files = result_files.scalars().all()
 
-# --- Function to create tables on startup ---
+                for file in expired_files:
+                    try:
+                        file_path = Path(file.file_path)
+                        if file_path.exists():
+                            os.remove(file_path)
+                            print(f"Deleted expired file from disk: {file.filename}")
+                    except Exception as e:
+                        print(f"Error deleting file {file.file_path} from disk: {e}")
+                    
+                    await db.delete(file)
+
+                # Find and delete expired text shares
+                expired_texts_query = select(TextShare).where(TextShare.expires_at < now)
+                result_texts = await db.execute(expired_texts_query)
+                expired_texts = result_texts.scalars().all()
+
+                for text in expired_texts:
+                    await db.delete(text)
+                
+                if expired_files or expired_texts:
+                    await db.commit()
+                    print(f"Cleanup complete. Removed {len(expired_files)} files and {len(expired_texts)} text shares.")
+                else:
+                    print("No expired data to clean up.")
+
+            except Exception as e:
+                print(f"An error occurred during scheduled cleanup: {e}")
+                await db.rollback()
+
+# --- MODIFIED: startup function to launch cleanup task ---
 @app.on_event("startup")
 async def startup():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+    
+    # Start the background cleanup task
+    asyncio.create_task(cleanup_expired_data())
 
-# --- Dependency to get a database session for each request ---
+# --- Dependency to get a database session ---
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     async with AsyncSessionLocal() as session:
         yield session
 
-
-# File storage directory (ephemeral on Render's free tier)
-UPLOAD_DIR = Path("/tmp/flowshare_files")
-UPLOAD_DIR.mkdir(exist_ok=True)
-
+# ... [Your MARVEL_CHARACTERS list and ConnectionManager class remain the same] ...
 # Marvel characters list
 MARVEL_CHARACTERS = [
     "Iron Man", "Captain America", "Thor", "Hulk", "Black Widow", "Hawkeye",
@@ -93,6 +136,7 @@ MARVEL_CHARACTERS = [
 
 # Active WebSocket connections and user sessions
 class ConnectionManager:
+    # ... [Paste your existing ConnectionManager class code here, it does not need changes] ...
     def __init__(self):
         self.active_connections: Dict[str, WebSocket] = {}
         self.user_sessions: Dict[str, dict] = {}
@@ -182,9 +226,10 @@ class ConnectionManager:
                 'success_count': success_count
             })
 
-
 manager = ConnectionManager()
-
+UPLOAD_DIR = Path("/tmp/flowshare_files")
+UPLOAD_DIR.mkdir(exist_ok=True)
+# ... [Your websocket endpoints and other routes] ...
 @app.websocket("/api/ws/{user_id}")
 async def websocket_endpoint(websocket: WebSocket, user_id: str):
     await manager.connect(websocket, user_id)
@@ -205,9 +250,18 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str):
 async def health_check():
     return {"status": "healthy", "service": "FlowShare P2P"}
 
+# --- MODIFIED: Upload endpoint with file size limit ---
 @app.post("/api/upload")
 async def upload_file(file: UploadFile = File(...), db: AsyncSession = Depends(get_db)):
     try:
+        # Check file size before doing anything else
+        MAX_FILE_SIZE = 100 * 1024 * 1024  # 100 MB
+        if file.size > MAX_FILE_SIZE:
+            raise HTTPException(
+                status_code=413, 
+                detail=f"File is too large ({round(file.size / (1024*1024), 2)} MB). Maximum size is 100MB."
+            )
+
         file_id = str(uuid.uuid4())
         file_path = UPLOAD_DIR / f"{file_id}_{file.filename}"
         with open(file_path, "wb") as buffer:
@@ -229,8 +283,11 @@ async def upload_file(file: UploadFile = File(...), db: AsyncSession = Depends(g
             "content_type": file.content_type, "type": "file"
         }
     except Exception as e:
+        if isinstance(e, HTTPException):
+            raise e
         raise HTTPException(status_code=500, detail=str(e))
 
+# ... [The rest of your endpoints: download, create_text_share, etc. remain the same] ...
 @app.get("/api/download/{file_id}")
 async def download_file(file_id: str, db: AsyncSession = Depends(get_db)):
     try:
