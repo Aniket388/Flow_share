@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import { Upload, Users, Send, FileText, Wifi, Loader2, Download, Copy, X, CheckCircle, ShieldAlert, WifiOff, MessageSquare } from 'lucide-react';
+import { Upload, Users, Send, FileText, Wifi, Loader2, Download, Copy, X, CheckCircle, ShieldAlert, WifiOff, MessageSquare } from 'lucide-react'; 
 import { Toaster, toast } from 'sonner';
 import { Button } from './components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './components/ui/card';
@@ -56,7 +56,6 @@ const timeoutErrorMessages = [
   "JARVIS reports a network anomaly. Upload timed out."
 ];
 
-
 const App = () => {
   const [dragActive, setDragActive] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -74,7 +73,6 @@ const App = () => {
   const [receivedShare, setReceivedShare] = useState(null);
   const [isDownloading, setIsDownloading] = useState(false);
   
-  // NEW: State for the chat feature
   const [chats, setChats] = useState({});
   const [activeChatUser, setActiveChatUser] = useState(null);
   const [currentMessage, setCurrentMessage] = useState('');
@@ -313,19 +311,17 @@ const App = () => {
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 text-white font-sans">
       <Toaster richColors position="top-right" theme="dark" />
       <div className="container mx-auto px-4 py-8 max-w-4xl">
-        {/* RESTORED: Header and main content */}
+        {/* Header and main content cards */}
         <div className="text-center mb-12">
-          <h1 className="text-6xl font-bold bg-gradient-to-r from-red-400 via-yellow-400 to-blue-400 bg-clip-text text-transparent mb-4">FlowShare</h1>
-          <p className="text-gray-300 text-xl">Marvel Share Network</p>
-          {myCharacter && <div className="mt-6 p-4 bg-gradient-to-r from-blue-600/20 to-purple-600/20 rounded-lg border border-blue-500/30"><h2 className="text-3xl font-bold text-white mb-2">You are: <span className="text-blue-400">{myCharacter}</span></h2><p className="text-gray-300">Your Marvel identity on the network</p></div>}
-          <div className="flex items-center justify-center gap-2 mt-4"><Wifi className={`w-5 h-5 ${connectionStatus === 'connected' ? 'text-green-400' : 'text-red-400'}`} /><span className={`text-sm ${connectionStatus === 'connected' ? 'text-green-400' : 'text-red-400'}`}>{connectionStatus === 'connected' ? `Connected to network` : 'Connecting...'}</span></div>
+            <h1 className="text-6xl font-bold bg-gradient-to-r from-red-400 via-yellow-400 to-blue-400 bg-clip-text text-transparent mb-4">FlowShare</h1>
+            <p className="text-gray-300 text-xl">Marvel Share Network</p>
+            {myCharacter && <div className="mt-6 p-4 bg-gradient-to-r from-blue-600/20 to-purple-600/20 rounded-lg border border-blue-500/30"><h2 className="text-3xl font-bold text-white mb-2">You are: <span className="text-blue-400">{myCharacter}</span></h2><p className="text-gray-300">Your Marvel identity on the network</p></div>}
+            <div className="flex items-center justify-center gap-2 mt-4"><Wifi className={`w-5 h-5 ${connectionStatus === 'connected' ? 'text-green-400' : 'text-red-400'}`} /><span className={`text-sm ${connectionStatus === 'connected' ? 'text-green-400' : 'text-red-400'}`}>{connectionStatus === 'connected' ? `Connected to network` : 'Connecting...'}</span></div>
         </div>
         <div className="grid md:grid-cols-2 gap-8">
-          <Card className="bg-slate-800/50 border-slate-700 backdrop-blur-sm"><CardHeader><CardTitle className="text-white flex items-center gap-2"><Upload className="w-5 h-5" /> Share a File</CardTitle></CardHeader><CardContent><div className={`border-2 border-dashed rounded-lg p-8 text-center transition-all duration-300 cursor-pointer ${dragActive ? 'border-blue-400 bg-blue-400/10' : 'border-slate-600 hover:border-slate-500'}`} onDragEnter={handleDrag} onDragLeave={handleDrag} onDragOver={handleDrag} onDrop={handleDrop} onClick={() => fileInputRef.current?.click()}>{isUploading ? (<div className="space-y-4"><Loader2 className="w-12 h-12 animate-spin text-blue-400 mx-auto" /><Progress value={uploadProgress} className="w-full" /><p className="text-gray-300">Uploading... {uploadProgress}%</p></div>) : (<><Upload className="w-16 h-16 text-slate-400 mx-auto mb-4" /><p className="text-white text-lg mb-2">Drop files here or click to browse</p><p className="text-gray-400">Any file type supported</p></>)}</div><input ref={fileInputRef} type="file" className="hidden" onChange={(e) => e.target.files && handleFileUpload(e.target.files[0])} /></CardContent></Card>
-          <Card className="bg-slate-800/50 border-slate-700 backdrop-blur-sm"><CardHeader><CardTitle className="text-white flex items-center gap-2"><FileText className="w-5 h-5" /> Share a Note</CardTitle></CardHeader><CardContent className="space-y-4"><Textarea placeholder="Type your message or paste text here..." value={textContent} onChange={(e) => setTextContent(e.target.value)} className="min-h-[120px] bg-slate-700/50 border-slate-600 text-white placeholder-gray-400" /><Button onClick={handleTextShare} disabled={!textContent.trim()} className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"><FileText className="w-4 h-4 mr-2" /> Share Note</Button></CardContent></Card>
+            <Card className="bg-slate-800/50 border-slate-700 backdrop-blur-sm"><CardHeader><CardTitle className="text-white flex items-center gap-2"><Upload className="w-5 h-5" /> Share a File</CardTitle></CardHeader><CardContent><div className={`border-2 border-dashed rounded-lg p-8 text-center transition-all duration-300 cursor-pointer ${dragActive ? 'border-blue-400 bg-blue-400/10' : 'border-slate-600 hover:border-slate-500'}`} onDragEnter={handleDrag} onDragLeave={handleDrag} onDragOver={handleDrag} onDrop={handleDrop} onClick={() => fileInputRef.current?.click()}>{isUploading ? (<div className="space-y-4"><Loader2 className="w-12 h-12 animate-spin text-blue-400 mx-auto" /><Progress value={uploadProgress} className="w-full" /><p className="text-gray-300">Uploading... {uploadProgress}%</p></div>) : (<><Upload className="w-16 h-16 text-slate-400 mx-auto mb-4" /><p className="text-white text-lg mb-2">Drop files here or click to browse</p><p className="text-gray-400">Any file type supported</p></>)}</div><input ref={fileInputRef} type="file" className="hidden" onChange={(e) => e.target.files && handleFileUpload(e.target.files[0])} /></CardContent></Card>
+            <Card className="bg-slate-800/50 border-slate-700 backdrop-blur-sm"><CardHeader><CardTitle className="text-white flex items-center gap-2"><FileText className="w-5 h-5" /> Share a Note</CardTitle></CardHeader><CardContent className="space-y-4"><Textarea placeholder="Type your message or paste text here..." value={textContent} onChange={(e) => setTextContent(e.target.value)} className="min-h-[120px] bg-slate-700/50 border-slate-600 text-white placeholder-gray-400" /><Button onClick={handleTextShare} disabled={!textContent.trim()} className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"><FileText className="w-4 h-4 mr-2" /> Share Note</Button></CardContent></Card>
         </div>
-        
-        {/* User list with updated chat button functionality */}
         <Card className="mt-8 bg-slate-800/50 border-slate-700 backdrop-blur-sm">
           <CardHeader><CardTitle className="text-white flex items-center gap-2"><Users className="w-5 h-5" /> Available Marvel Heroes ({connectedUsers.length})</CardTitle></CardHeader>
           <CardContent>{connectedUsers.length === 0 ? (<p className="text-gray-400 text-center py-8">No other heroes online.</p>) : (<div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">{connectedUsers.map((user) => (<div key={user.user_id} className={`p-3 rounded-lg border cursor-pointer transition-all duration-200 ${selectedUsers.has(user.user_id) ? 'border-blue-400 bg-blue-400/20' : 'border-slate-600 hover:border-slate-500 bg-slate-700/50'}`} onClick={() => toggleUserSelection(user)}><Badge variant="secondary" className="w-full justify-center flex gap-2 items-center"><button onClick={(e) => { e.stopPropagation(); sendChatRequest(user); }} className="hover:text-blue-400 p-1 -m-1" title={`Chat with ${user.character}`}><MessageSquare className="w-4 h-4"/></button><span>{user.character}</span></Badge></div>))}</div>)}</CardContent>
@@ -343,11 +339,18 @@ const App = () => {
                 <Card className="bg-slate-800 border-slate-700 w-full max-w-lg h-[70vh] flex flex-col">
                     <CardHeader><div className="flex justify-between items-center"><CardTitle className="text-white flex items-center gap-2"><MessageSquare className="w-5 h-5 text-blue-400" />Chat with {activeChatUser.character}</CardTitle><Button onClick={() => setActiveChatUser(null)} variant="ghost" size="sm" className="text-gray-400 hover:text-white"><X className="w-4 h-4" /></Button></div></CardHeader>
                     <CardContent className="flex-1 overflow-y-auto p-4 space-y-4">
+                        {/* MODIFIED: This is the new, corrected chat bubble logic */}
                         {(chats[activeChatUser.user_id] || []).map((msg, index) => (
-                            <div key={index} className={`flex items-end gap-2 ${msg.sender === myCharacter ? 'justify-end' : 'justify-start'}`}>
-                                {msg.sender !== myCharacter && <Badge variant="secondary" className="bg-slate-600 text-gray-200 w-8 h-8 flex items-center justify-center">{msg.sender.charAt(0)}</Badge>}
-                                <div className={`max-w-xs md:max-w-md p-3 rounded-lg ${msg.sender === myCharacter ? 'bg-blue-600 text-white' : 'bg-slate-700 text-gray-200'}`}><p className="text-sm">{msg.content}</p></div>
-                                {msg.sender === myCharacter && <Badge variant="secondary" className="bg-blue-600 text-white w-8 h-8 flex items-center justify-center">{myCharacter.charAt(0)}</Badge>}
+                            <div key={index} className={`flex w-full items-end gap-2 ${msg.sender === myCharacter ? 'justify-end' : 'justify-start'}`}>
+                                {msg.sender !== myCharacter && (
+                                    <Badge variant="secondary" className="bg-slate-600 text-gray-200 w-8 h-8 flex items-center justify-center self-start flex-shrink-0">{msg.sender.charAt(0)}</Badge>
+                                )}
+                                <div className={`max-w-xs md:max-w-md p-3 rounded-lg ${msg.sender === myCharacter ? 'bg-blue-600 text-white' : 'bg-slate-700 text-gray-200'}`}>
+                                    <p className="text-sm" style={{ wordBreak: 'break-word' }}>{msg.content}</p>
+                                </div>
+                                {msg.sender === myCharacter && (
+                                    <Badge variant="secondary" className="bg-blue-600 text-white w-8 h-8 flex items-center justify-center self-start flex-shrink-0">{myCharacter.charAt(0)}</Badge>
+                                )}
                             </div>
                         ))}
                         <div ref={chatMessagesEndRef} />
