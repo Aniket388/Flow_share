@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 from typing import Dict, List, AsyncGenerator
 import shutil
 from pathlib import Path
-import asyncio  # Import asyncio
+import asyncio
 
 # --- SQLAlchemy Imports ---
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
@@ -18,10 +18,14 @@ from sqlalchemy import Column, String, Integer, DateTime, Text, select
 
 app = FastAPI()
 
-# --- More secure CORS middleware ---
+# --- MODIFIED: More robust CORS settings ---
+# This explicitly allows both versions of your domain to prevent future issues.
 origins = [
-    os.environ.get("FRONTEND_URL", "http://localhost:3000")
+    "https://flowshare.me",
+    "https://www.flowshare.me",
+    "http://localhost:3000", # For local development
 ]
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
@@ -29,6 +33,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+# --- END MODIFIED ---
 
 # --- SQLAlchemy Database Setup with URL Fix ---
 DATABASE_URL = os.environ.get("DATABASE_URL")
@@ -61,13 +66,10 @@ class TextShare(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     expires_at = Column(DateTime)
     
-# --- NEW: Background Cleanup Task ---
+# --- Background Cleanup Task ---
 async def cleanup_expired_data():
-    """
-    A background task that runs every 10 minutes to clean up expired data.
-    """
     while True:
-        await asyncio.sleep(600)  # Sleep for 10 minutes (600 seconds)
+        await asyncio.sleep(600)  # Sleep for 10 minutes
         print("Running scheduled cleanup of expired data...")
         
         async with AsyncSessionLocal() as db:
@@ -84,7 +86,6 @@ async def cleanup_expired_data():
                         file_path = Path(file.file_path)
                         if file_path.exists():
                             os.remove(file_path)
-                            print(f"Deleted expired file from disk: {file.filename}")
                     except Exception as e:
                         print(f"Error deleting file {file.file_path} from disk: {e}")
                     
@@ -108,13 +109,12 @@ async def cleanup_expired_data():
                 print(f"An error occurred during scheduled cleanup: {e}")
                 await db.rollback()
 
-# --- MODIFIED: startup function to launch cleanup task ---
+# --- startup function to launch cleanup task ---
 @app.on_event("startup")
 async def startup():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     
-    # Start the background cleanup task
     asyncio.create_task(cleanup_expired_data())
 
 # --- Dependency to get a database session ---
@@ -229,6 +229,7 @@ class ConnectionManager:
 manager = ConnectionManager()
 UPLOAD_DIR = Path("/tmp/flowshare_files")
 UPLOAD_DIR.mkdir(exist_ok=True)
+
 # ... [Your websocket endpoints and other routes] ...
 @app.websocket("/api/ws/{user_id}")
 async def websocket_endpoint(websocket: WebSocket, user_id: str):
@@ -250,13 +251,13 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str):
 async def health_check():
     return {"status": "healthy", "service": "FlowShare P2P"}
 
-# --- MODIFIED: Upload endpoint with file size limit ---
+# --- Upload endpoint with file size limit ---
 @app.post("/api/upload")
 async def upload_file(file: UploadFile = File(...), db: AsyncSession = Depends(get_db)):
     try:
         # Check file size before doing anything else
         MAX_FILE_SIZE = 100 * 1024 * 1024  # 100 MB
-        if file.size > MAX_FILE_SIZE:
+        if file.size and file.size > MAX_FILE_SIZE:
             raise HTTPException(
                 status_code=413, 
                 detail=f"File is too large ({round(file.size / (1024*1024), 2)} MB). Maximum size is 100MB."
