@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-// MODIFIED: Added ShieldAlert for the error icon and Toaster for custom notifications
-import { Upload, Users, Send, FileText, Wifi, Loader2, Download, Copy, X, CheckCircle, ShieldAlert } from 'lucide-react'; 
-import { Toaster, toast } from 'sonner';
+import { Upload, Users, Send, FileText, Wifi, Loader2, Download, Copy, X, CheckCircle, ShieldAlert } from 'lucide-react';
+import { toast } from 'sonner';
 import { Button } from './components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './components/ui/card';
 import { Textarea } from './components/ui/textarea';
@@ -10,12 +9,33 @@ import { Badge } from './components/ui/badge';
 import { Progress } from './components/ui/progress';
 import './App.css';
 
+// NEW: Expanded list of random error messages
 const sizeErrorMessages = [
-  "This file is too heavy for even the Hulk!",
-  "S.H.I.E.L.D. protocols limit transfers to 100MB.",
-  "My Pym Particle supply is low. Can't handle files over 100MB.",
-  "This file is too powerful! It exceeds the 100MB containment field.",
-  "Even Mjolnir isn't this heavy. Please keep files under 100MB."
+    "This file is too heavy for even the Hulk!",
+    "S.H.I.E.L.D. protocols limit transfers to 100MB.",
+    "My Pym Particle supply is low. Can't handle files over 100MB.",
+    "Even Mjolnir isn't this heavy. Please keep files under 100MB.",
+    "JARVIS reports this file's data signature is too large. Keep it under 100MB.",
+    "Perfectly balanced... this file is not. Must be under 100MB to maintain cosmic order.",
+    "Language! That's a big file. The limit here is 100MB, soldier.",
+    "Are you trying to send a whole moon? This system can't handle more than 100MB!",
+    "With great file size comes great server responsibility. The 100MB limit must be respected.",
+    "Even Vibranium servers have their limits. Files over 100MB cannot be processed.",
+    "This file has been classified as a Level 7 threat. All transmissions must be under 100MB.",
+    "Looks like you'll need some PYM particles for that file! Must be under 100MB.",
+    "The bifrost can't sustain a transfer of this magnitude! Keep it under 100MB.",
+    "This file's energy signature is too large for the Tesseract. Keep transfers under 100MB.",
+    "This file is too heavy for a cosmic flight. It's over the 100MB weight limit.",
+    "SMASH! This file is too big! Keep it under 100MB before things get... angry.",
+    "This file is a Nexus event. Prune it to under 100MB to protect the Sacred Timeline.",
+    "I can do this all day. But I can't upload a file over 100MB.",
+    "On your left... is a smaller file, I hope. This one exceeds the 100MB limit.",
+    "This file is too big. I don't feel so good... Try something under 100MB.",
+    "I went forward in time to view 14,000,605 futures. In none of them does this upload succeed.",
+    "That's my secret, Cap. I'm always angry... at files over 100MB.",
+    "I love you 3000, but I don't love files over 100MB.",
+    "This file is too big to fit in the Quantum Realm. Please shrink it to under 100MB.",
+    "Cerebro has detected a file with a power signature that is off the charts. Max capacity is 100MB."
 ];
 
 const App = () => {
@@ -108,15 +128,34 @@ const App = () => {
   };
 
   const handleIncomingShare = (message) => {
-    toast.info(`${message.from_character} is sharing something with you!`);
-    
-    setReceivedShare({
-      from_character: message.from_character,
-      from_user_id: message.from_user_id,
-      share_data: message.share_data,
-      timestamp: message.timestamp
+    const shareData = message.share_data;
+    const fromCharacter = message.from_character;
+
+    const tempReceivedShare = {
+        from_character: fromCharacter,
+        share_data: shareData
+    };
+
+    toast.message(`Incoming Share from ${fromCharacter}`, {
+      description: shareData.type === 'file' 
+        ? `File: ${shareData.filename}`
+        : `Note: ${shareData.content.substring(0, 30)}...`,
+      duration: 15000,
+      action: {
+        label: shareData.type === 'file' ? 'Download' : 'Copy',
+        onClick: () => {
+          if (shareData.type === 'file') {
+            handleDownloadFile(tempReceivedShare);
+          } else {
+            handleCopyText(tempReceivedShare);
+          }
+        },
+      },
+      cancel: {
+        label: 'Dismiss',
+        onClick: () => {},
+      },
     });
-    setShowReceiveModal(true);
   };
 
   const handleDrag = (e) => {
@@ -142,18 +181,16 @@ const App = () => {
   const handleFileUpload = async (file) => {
     if (!file) return;
 
-    const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100 MB
+    const MAX_FILE_SIZE = 100 * 1024 * 1024;
     if (file.size > MAX_FILE_SIZE) {
       const randomIndex = Math.floor(Math.random() * sizeErrorMessages.length);
       const randomMessage = sizeErrorMessages[randomIndex];
       
-      // MODIFIED: Added a superhero icon and removed custom styles to use the Toaster's richColors prop
       toast.error(randomMessage, {
         icon: <ShieldAlert className="w-5 h-5" />,
         description: `Your file is ${Math.round(file.size / (1024*1024))}MB. Please keep it under 100MB.`,
       });
 
-      // NEW: Reset the file input so the user can select another file without refreshing
       if (fileInputRef.current) {
         fileInputRef.current.value = null;
       }
@@ -255,28 +292,29 @@ const App = () => {
     }
   };
   
-  const handleCopyText = async () => {
-    if (!receivedShare?.share_data?.content) return;
+  const handleCopyText = async (shareToCopy) => {
+    if (!shareToCopy?.share_data?.content) return;
     try {
-      await navigator.clipboard.writeText(receivedShare.share_data.content);
+      await navigator.clipboard.writeText(shareToCopy.share_data.content);
       toast.success('Text copied to clipboard!');
     } catch (error) {
       toast.error('Could not copy text.');
     }
   };
 
-  const handleDownloadFile = async () => {
-    if (!receivedShare?.share_data?.file_id) return;
+  const handleDownloadFile = async (shareToDownload) => {
+    if (!shareToDownload?.share_data?.file_id) return;
     setIsDownloading(true);
+    toast.info('Starting download...');
     try {
-      const response = await axios.get(`${backendUrl}/api/download/${receivedShare.share_data.file_id}`, {
+      const response = await axios.get(`${backendUrl}/api/download/${shareToDownload.share_data.file_id}`, {
         responseType: 'blob'
       });
       
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', receivedShare.share_data.filename);
+      link.setAttribute('download', shareToDownload.share_data.filename);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -289,11 +327,6 @@ const App = () => {
     } finally {
       setIsDownloading(false);
     }
-  };
-
-  const closeReceiveModal = () => {
-    setShowReceiveModal(false);
-    setReceivedShare(null);
   };
 
   const getFileIcon = (filename) => {
@@ -310,8 +343,7 @@ const App = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 text-white font-sans">
-      {/* NEW: Add the Toaster component here for rich, animated notifications */}
-      <Toaster richColors position="top-center" theme="dark" />
+      {/* REMOVED: Toaster component deleted from here to fix the duplicate notification issue. */}
       <div className="container mx-auto px-4 py-8 max-w-4xl">
         {/* Header */}
         <div className="text-center mb-12">
@@ -339,7 +371,6 @@ const App = () => {
 
         {/* Main Content */}
         <div className="grid md:grid-cols-2 gap-8">
-          {/* File Upload Section */}
           <Card className="bg-slate-800/50 border-slate-700 backdrop-blur-sm">
             <CardHeader><CardTitle className="text-white flex items-center gap-2"><Upload className="w-5 h-5" /> Share a File</CardTitle></CardHeader>
             <CardContent>
@@ -365,8 +396,6 @@ const App = () => {
               <input ref={fileInputRef} type="file" className="hidden" onChange={(e) => e.target.files && handleFileUpload(e.target.files[0])} />
             </CardContent>
           </Card>
-
-          {/* Text Share Section */}
           <Card className="bg-slate-800/50 border-slate-700 backdrop-blur-sm">
             <CardHeader><CardTitle className="text-white flex items-center gap-2"><FileText className="w-5 h-5" /> Share a Note</CardTitle></CardHeader>
             <CardContent className="space-y-4">
@@ -383,7 +412,6 @@ const App = () => {
           </Card>
         </div>
 
-        {/* Connected Users list for pre-selection */}
         <Card className="mt-8 bg-slate-800/50 border-slate-700 backdrop-blur-sm">
           <CardHeader>
             <CardTitle className="text-white flex items-center gap-2">
@@ -393,29 +421,12 @@ const App = () => {
           </CardHeader>
           <CardContent>
             {connectedUsers.length === 0 ? (
-              <p className="text-gray-400 text-center py-8">
-                No other heroes online to select.
-              </p>
+              <p className="text-gray-400 text-center py-8">No other heroes online to select.</p>
             ) : (
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                 {connectedUsers.map((user) => (
-                  <div
-                    key={user.user_id}
-                    className={`p-3 rounded-lg border cursor-pointer transition-all duration-200 ${
-                      selectedUsers.has(user.user_id)
-                        ? 'border-blue-400 bg-blue-400/20'
-                        : 'border-slate-600 hover:border-slate-500 bg-slate-700/50'
-                    }`}
-                    onClick={() => toggleUserSelection(user)}
-                  >
-                    <Badge 
-                      variant="secondary" 
-                      className={`w-full justify-center ${
-                        selectedUsers.has(user.user_id) 
-                          ? 'bg-blue-600 text-white' 
-                          : 'bg-slate-600 text-gray-200'
-                      }`}
-                    >
+                  <div key={user.user_id} className={`p-3 rounded-lg border cursor-pointer transition-all duration-200 ${selectedUsers.has(user.user_id) ? 'border-blue-400 bg-blue-400/20' : 'border-slate-600 hover:border-slate-500 bg-slate-700/50'}`} onClick={() => toggleUserSelection(user)}>
+                    <Badge variant="secondary" className={`w-full justify-center ${selectedUsers.has(user.user_id) ? 'bg-blue-600 text-white' : 'bg-slate-600 text-gray-200'}`}>
                       {user.character}
                     </Badge>
                   </div>
@@ -425,69 +436,38 @@ const App = () => {
           </CardContent>
         </Card>
 
-        {/* Share Modal */}
         {showShareModal && currentShare && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
             <Card className="bg-slate-800 border-slate-700 w-full max-w-lg">
               <CardHeader>
                 <div className="flex justify-between items-center">
                     <CardTitle className="text-white">Share Your {currentShare.type === 'file' ? 'File' : 'Note'}</CardTitle>
-                    <Button onClick={() => setShowShareModal(false)} variant="ghost" size="sm" className="text-gray-400 hover:text-white">
-                        <X className="w-4 h-4" />
-                    </Button>
+                    <Button onClick={() => setShowShareModal(false)} variant="ghost" size="sm" className="text-gray-400 hover:text-white"><X className="w-4 h-4" /></Button>
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="p-4 bg-slate-700/50 rounded-lg">
-                  <p className="text-white font-medium truncate">
-                    {currentShare.type === 'file' ? currentShare.filename : currentShare.title}
-                  </p>
-                </div>
-                
+                <div className="p-4 bg-slate-700/50 rounded-lg"><p className="text-white font-medium truncate">{currentShare.type === 'file' ? currentShare.filename : currentShare.title}</p></div>
                 <div className="space-y-2">
-                    <h3 className="text-white font-semibold flex items-center gap-2">
-                        <Users className="w-5 h-5" />
-                        Confirm or Change Recipients
-                    </h3>
+                    <h3 className="text-white font-semibold flex items-center gap-2"><Users className="w-5 h-5" />Confirm or Change Recipients</h3>
                     {connectedUsers.length === 0 ? (
                         <p className="text-gray-400 text-center py-4">No other heroes are online to share with.</p>
                     ) : (
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-2 max-h-48 overflow-y-auto p-1">
                             {connectedUsers.map((user) => (
-                            <div
-                                key={user.user_id}
-                                className={`p-2 rounded-lg border text-center cursor-pointer transition-all duration-200 ${
-                                modalSelectedUsers.has(user.user_id)
-                                    ? 'border-blue-400 bg-blue-400/20 text-white'
-                                    : 'border-slate-600 hover:border-slate-500 bg-slate-700/50 text-gray-300'
-                                }`}
-                                onClick={() => toggleModalUserSelection(user)}
-                            >
+                            <div key={user.user_id} className={`p-2 rounded-lg border text-center cursor-pointer transition-all duration-200 ${modalSelectedUsers.has(user.user_id) ? 'border-blue-400 bg-blue-400/20 text-white' : 'border-slate-600 hover:border-slate-500 bg-slate-700/50 text-gray-300'}`} onClick={() => toggleModalUserSelection(user)}>
                                 {user.character}
                             </div>
                             ))}
                         </div>
                     )}
                 </div>
-
-                <p className="text-gray-300 text-sm pt-2">
-                  Final selection: {modalSelectedUsers.size} hero{modalSelectedUsers.size !== 1 ? 's' : ''}
-                </p>
-                
+                <p className="text-gray-300 text-sm pt-2">Final selection: {modalSelectedUsers.size} hero{modalSelectedUsers.size !== 1 ? 's' : ''}</p>
                 <div className="flex gap-2">
-                  <Button
-                    onClick={handleShareNow}
-                    disabled={modalSelectedUsers.size === 0}
-                    className="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700"
-                  >
+                  <Button onClick={handleShareNow} disabled={modalSelectedUsers.size === 0} className="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700">
                     <Send className="w-4 h-4 mr-2" />
                     Share Now
                   </Button>
-                  <Button
-                    onClick={() => setShowShareModal(false)}
-                    variant="outline"
-                    className="border-slate-600 text-gray-300 hover:bg-slate-700"
-                  >
+                  <Button onClick={() => setShowShareModal(false)} variant="outline" className="border-slate-600 text-gray-300 hover:bg-slate-700">
                     Cancel
                   </Button>
                 </div>
@@ -496,64 +476,8 @@ const App = () => {
           </div>
         )}
 
-        {/* Receive Modal */}
-        {showReceiveModal && receivedShare && (
-           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-             <Card className="bg-slate-800 border-slate-700 w-full max-w-md">
-               <CardHeader>
-                 <div className="flex items-center justify-between">
-                   <CardTitle className="text-white flex items-center gap-2">
-                     <CheckCircle className="w-5 h-5 text-green-400" />
-                     {receivedShare.from_character} sent you something!
-                   </CardTitle>
-                   <Button onClick={closeReceiveModal} variant="ghost" size="sm" className="text-gray-400 hover:text-white">
-                     <X className="w-4 h-4" />
-                   </Button>
-                 </div>
-               </CardHeader>
-               <CardContent className="space-y-4">
-                 <div className="p-4 bg-slate-700/50 rounded-lg">
-                   {receivedShare.share_data.type === 'file' ? (
-                     <div className="flex items-center gap-3">
-                       <span className="text-2xl">{getFileIcon(receivedShare.share_data.filename)}</span>
-                       <div>
-                         <p className="text-white font-medium">{receivedShare.share_data.filename}</p>
-                         <p className="text-gray-400 text-sm">
-                           {Math.round(receivedShare.share_data.size / 1024)} KB
-                         </p>
-                       </div>
-                     </div>
-                   ) : (
-                     <div>
-                       <p className="text-white font-medium mb-2">{receivedShare.share_data.title}</p>
-                       <p className="text-gray-300 text-sm max-h-32 overflow-y-auto">
-                         {receivedShare.share_data.content}
-                       </p>
-                     </div>
-                   )}
-                 </div>
-                 
-                 <div className="flex gap-2">
-                   {receivedShare.share_data.type === 'file' ? (
-                     <Button onClick={handleDownloadFile} disabled={isDownloading} className="flex-1 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700">
-                       {isDownloading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}
-                       Download File
-                     </Button>
-                   ) : (
-                     <Button onClick={handleCopyText} className="flex-1 bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700">
-                       <Copy className="w-4 h-4 mr-2" />
-                       Copy Text
-                     </Button>
-                   )}
-                   
-                   <Button onClick={closeReceiveModal} variant="outline" className="border-slate-600 text-gray-300 hover:bg-slate-700">
-                     Close
-                   </Button>
-                 </div>
-               </CardContent>
-             </Card>
-           </div>
-        )}
+        {/* REMOVED: The old Receive Modal is no longer needed. */}
+
       </div>
     </div>
   );
