@@ -37,7 +37,6 @@ const sizeErrorMessages = [
     "Cerebro has detected a file with a power signature that is off the charts. Max capacity is 100MB."
 ];
 
-// NEW: Superhero-themed timeout messages
 const timeoutErrorMessages = [
   "The Bifrost connection is unstable! Upload timed out.",
   "Strange can't keep the portal open this long. Upload timed out.",
@@ -69,7 +68,6 @@ const App = () => {
   const [connectionStatus, setConnectionStatus] = useState('disconnected');
   const [currentShare, setCurrentShare] = useState(null);
   const [showShareModal, setShowShareModal] = useState(false);
-  const [showReceiveModal, setShowReceiveModal] = useState(false);
   const [receivedShare, setReceivedShare] = useState(null);
   const [isDownloading, setIsDownloading] = useState(false);
   
@@ -238,7 +236,6 @@ const App = () => {
       
     } catch (error) {
       if (error.code === 'ECONNABORTED') {
-        // MODIFIED: Use superhero-themed timeout messages
         const randomIndex = Math.floor(Math.random() * timeoutErrorMessages.length);
         const randomMessage = timeoutErrorMessages[randomIndex];
 
@@ -254,6 +251,10 @@ const App = () => {
     } finally {
       setIsUploading(false);
       setUploadProgress(0);
+      // NEW: Reset the file input after every attempt (success or fail)
+      if (fileInputRef.current) {
+        fileInputRef.current.value = null;
+      }
     }
   };
 
@@ -464,6 +465,47 @@ const App = () => {
             )}
           </CardContent>
         </Card>
+
+        {/* NEW: Restored the Share Modal JSX block */}
+        {showShareModal && currentShare && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+            <Card className="bg-slate-800 border-slate-700 w-full max-w-lg">
+              <CardHeader>
+                <div className="flex justify-between items-center">
+                    <CardTitle className="text-white">Share Your {currentShare.type === 'file' ? 'File' : 'Note'}</CardTitle>
+                    <Button onClick={() => setShowShareModal(false)} variant="ghost" size="sm" className="text-gray-400 hover:text-white"><X className="w-4 h-4" /></Button>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="p-4 bg-slate-700/50 rounded-lg"><p className="text-white font-medium truncate">{currentShare.type === 'file' ? currentShare.filename : currentShare.title}</p></div>
+                <div className="space-y-2">
+                    <h3 className="text-white font-semibold flex items-center gap-2"><Users className="w-5 h-5" />Confirm or Change Recipients</h3>
+                    {connectedUsers.length === 0 ? (
+                        <p className="text-gray-400 text-center py-4">No other heroes are online to share with.</p>
+                    ) : (
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-2 max-h-48 overflow-y-auto p-1">
+                            {connectedUsers.map((user) => (
+                            <div key={user.user_id} className={`p-2 rounded-lg border text-center cursor-pointer transition-all duration-200 ${modalSelectedUsers.has(user.user_id) ? 'border-blue-400 bg-blue-400/20 text-white' : 'border-slate-600 hover:border-slate-500 bg-slate-700/50 text-gray-300'}`} onClick={() => toggleModalUserSelection(user)}>
+                                {user.character}
+                            </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+                <p className="text-gray-300 text-sm pt-2">Final selection: {modalSelectedUsers.size} hero{modalSelectedUsers.size !== 1 ? 's' : ''}</p>
+                <div className="flex gap-2">
+                  <Button onClick={handleShareNow} disabled={modalSelectedUsers.size === 0} className="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700">
+                    <Send className="w-4 h-4 mr-2" />
+                    Share Now
+                  </Button>
+                  <Button onClick={() => setShowShareModal(false)} variant="outline" className="border-slate-600 text-gray-300 hover:bg-slate-700">
+                    Cancel
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
         
       </div>
     </div>
