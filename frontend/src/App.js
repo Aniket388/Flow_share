@@ -9,13 +9,21 @@ import { Progress } from './components/ui/progress';
 import { toast } from 'sonner';
 import './App.css';
 
+// NEW: Array of fun, random error messages
+const sizeErrorMessages = [
+  "This file is too heavy for even the Hulk!",
+  "S.H.I.E.L.D. protocols limit transfers to 100MB.",
+  "My Pym Particle supply is low. Can't handle files over 100MB.",
+  "This file is too powerful! It exceeds the 100MB containment field.",
+  "Even Mjolnir isn't this heavy. Please keep files under 100MB."
+];
+
 const App = () => {
   const [dragActive, setDragActive] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
   const [textContent, setTextContent] = useState('');
   const [connectedUsers, setConnectedUsers] = useState([]);
-  // NEW: Re-introduced main selection state for pre-selection
   const [selectedUsers, setSelectedUsers] = useState(new Set()); 
   const [modalSelectedUsers, setModalSelectedUsers] = useState(new Set());
   const [myCharacter, setMyCharacter] = useState('');
@@ -136,8 +144,17 @@ const App = () => {
 
     const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100 MB
     if (file.size > MAX_FILE_SIZE) {
-      toast.error("This file is too heavy for even the Hulk!", {
+      // MODIFIED: Select a random message and apply custom styles
+      const randomIndex = Math.floor(Math.random() * sizeErrorMessages.length);
+      const randomMessage = sizeErrorMessages[randomIndex];
+      
+      toast.error(randomMessage, {
         description: `Your file is ${Math.round(file.size / (1024*1024))}MB. Please keep it under 100MB.`,
+        style: {
+          background: 'hsl(240, 50%, 15%)',
+          color: '#ffffff',
+          border: '1px solid hsl(240, 30%, 30%)',
+        },
       });
       return;
     }
@@ -158,10 +175,9 @@ const App = () => {
       });
       
       setCurrentShare(response.data);
-      // NEW: Sync main selections with the modal's selections
       setModalSelectedUsers(new Set(selectedUsers)); 
       setShowShareModal(true);
-      toast.success('📁 File uploaded successfully! Now choose who to send it to.');
+      toast.success('📁 File uploaded! Now choose who to send it to.');
       
     } catch (error) {
       const errorMessage = error.response?.data?.detail || 'Failed to upload file. Please try again.';
@@ -186,11 +202,10 @@ const App = () => {
       });
       
       setCurrentShare(response.data);
-      // NEW: Sync main selections with the modal's selections
       setModalSelectedUsers(new Set(selectedUsers));
       setShowShareModal(true);
       setTextContent('');
-      toast.success('📝 Text note ready to share! Now choose who to send it to.');
+      toast.success('📝 Note ready! Now choose who to send it to.');
       
     } catch (error) {
       toast.error('❌ Failed to create text share. Please try again.');
@@ -198,7 +213,6 @@ const App = () => {
     }
   };
 
-  // NEW: Handler for the main page (pre-selection)
   const toggleUserSelection = (user) => {
     const newSelection = new Set(selectedUsers);
     if (newSelection.has(user.user_id)) {
@@ -209,7 +223,6 @@ const App = () => {
     setSelectedUsers(newSelection);
   };
 
-  // Handler for inside the modal
   const toggleModalUserSelection = (user) => {
     const newSelection = new Set(modalSelectedUsers);
     if (newSelection.has(user.user_id)) {
@@ -302,7 +315,8 @@ const App = () => {
           <h1 className="text-6xl font-bold bg-gradient-to-r from-red-400 via-yellow-400 to-blue-400 bg-clip-text text-transparent mb-4">
             FlowShare
           </h1>
-          <p className="text-gray-300 text-xl">P2P Marvel Share Network</p>
+          {/* MODIFIED: Removed "P2P" */}
+          <p className="text-gray-300 text-xl">Marvel Share Network</p>
           
           {myCharacter && (
             <div className="mt-6 p-4 bg-gradient-to-r from-blue-600/20 to-purple-600/20 rounded-lg border border-blue-500/30">
@@ -367,7 +381,7 @@ const App = () => {
           </Card>
         </div>
 
-        {/* NEW: Connected Users list is back on the main page for pre-selection */}
+        {/* Connected Users list for pre-selection */}
         <Card className="mt-8 bg-slate-800/50 border-slate-700 backdrop-blur-sm">
           <CardHeader>
             <CardTitle className="text-white flex items-center gap-2">
