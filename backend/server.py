@@ -18,12 +18,11 @@ from sqlalchemy import Column, String, Integer, DateTime, Text, select
 
 app = FastAPI()
 
-# --- MODIFIED: More robust CORS settings ---
-# This explicitly allows both versions of your domain to prevent future issues.
+# --- More robust CORS settings ---
 origins = [
     "https://flowshare.me",
     "https://www.flowshare.me",
-    "http://localhost:3000", # For local development
+    "http://localhost:3000",
 ]
 
 app.add_middleware(
@@ -33,7 +32,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-# --- END MODIFIED ---
 
 # --- SQLAlchemy Database Setup with URL Fix ---
 DATABASE_URL = os.environ.get("DATABASE_URL")
@@ -76,7 +74,6 @@ async def cleanup_expired_data():
             try:
                 now = datetime.utcnow()
                 
-                # Find and delete expired files
                 expired_files_query = select(FileStorage).where(FileStorage.expires_at < now)
                 result_files = await db.execute(expired_files_query)
                 expired_files = result_files.scalars().all()
@@ -91,7 +88,6 @@ async def cleanup_expired_data():
                     
                     await db.delete(file)
 
-                # Find and delete expired text shares
                 expired_texts_query = select(TextShare).where(TextShare.expires_at < now)
                 result_texts = await db.execute(expired_texts_query)
                 expired_texts = result_texts.scalars().all()
@@ -124,13 +120,11 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
 
 # Marvel characters list
 MARVEL_CHARACTERS = [
-    # Updated Marvel characters list
-MARVEL_CHARACTERS = [
     "Iron Man", "Captain America", "Thor", "Hulk", "Black Widow", "Hawkeye", "Spider-Man", 
     "Doctor Strange", "Scarlet Witch", "Captain Marvel", "Black Panther", "Falcon", 
     "Winter Soldier", "Ant-Man", "Wasp", "Star-Lord", "Gamora", "Drax", "Rocket Raccoon", 
     "Groot", "Nebula", "Loki", "Vision", "War Machine", "Quicksilver", "Shuri", "Okoye", 
-    "Valkyrie", "Ms. Marvel", "She-Hulk", "Moon Knight", "Daredevil", 
+    "Valkyrie", "Ms. Marvel (Kamala Khan)", "She-Hulk", "Moon Knight", "Daredevil", 
     "Jessica Jones", "Luke Cage", "Iron Fist", "Punisher", "Ghost Rider", "Wolverine", 
     "Mr. Fantastic", "Black Bolt", "Cyclops", "Jean Grey", "Professor X", "Invisible Woman", 
     "Silver Surfer", "Gambit", "Rogue", "Namor", "Blade", "Human Torch", "Storm", "The Thing", 
@@ -142,7 +136,6 @@ MARVEL_CHARACTERS = [
     "Clea", "Firestar", "Lockjaw", "Agent Venom", "Polaris", "Black Knight", 
     "White Tiger", "Elsa Bloodstone", "Ka-Zar", "Man-Thing", "Heimdall", "Lady Sif", 
     "Mockingbird", "Odin", "Shang-Chi"
-]
 ]
 
 # Active WebSocket connections and user sessions
@@ -256,21 +249,16 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str):
         manager.disconnect(user_id)
         await manager.broadcast_user_list()
 
-@app.api_route("/api/health", methods=["GET", "HEAD"])
+@app.get("/api/health")
 async def health_check():
     return {"status": "healthy", "service": "FlowShare P2P"}
 
-# --- Upload endpoint with file size limit ---
 @app.post("/api/upload")
 async def upload_file(file: UploadFile = File(...), db: AsyncSession = Depends(get_db)):
     try:
-        # Check file size before doing anything else
-        MAX_FILE_SIZE = 100 * 1024 * 1024  # 100 MB
+        MAX_FILE_SIZE = 100 * 1024 * 1024
         if file.size and file.size > MAX_FILE_SIZE:
-            raise HTTPException(
-                status_code=413, 
-                detail=f"File is too large ({round(file.size / (1024*1024), 2)} MB). Maximum size is 100MB."
-            )
+            raise HTTPException(status_code=413, detail=f"File is too large ({round(file.size / (1024*1024), 2)} MB). Maximum size is 100MB.")
 
         file_id = str(uuid.uuid4())
         file_path = UPLOAD_DIR / f"{file_id}_{file.filename}"
@@ -283,19 +271,14 @@ async def upload_file(file: UploadFile = File(...), db: AsyncSession = Depends(g
             content_type=file.content_type,
             size=file.size,
             file_path=str(file_path),
-            # --- MODIFIED: Expiration time changed to 9 minutes ---
-            expires_at=datetime.utcnow() + timedelta(minutes=9)
+            expires_at=datetime.utcnow() + timedelta(minutes=30)
         )
         db.add(new_file)
         await db.commit()
         
-        return {
-            "file_id": file_id, "filename": file.filename, "size": file.size,
-            "content_type": file.content_type, "type": "file"
-        }
+        return {"file_id": file_id, "filename": file.filename, "size": file.size, "content_type": file.content_type, "type": "file"}
     except Exception as e:
-        if isinstance(e, HTTPException):
-            raise e
+        if isinstance(e, HTTPException): raise e
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/download/{file_id}")
@@ -305,14 +288,11 @@ async def download_file(file_id: str, db: AsyncSession = Depends(get_db)):
         result = await db.execute(query)
         file_doc = result.scalars().first()
         
-        if not file_doc:
-            raise HTTPException(status_code=404, detail="File not found")
-        if datetime.utcnow() > file_doc.expires_at:
-            raise HTTPException(status_code=410, detail="File has expired")
+        if not file_doc: raise HTTPException(status_code=404, detail="File not found")
+        if datetime.utcnow() > file_doc.expires_at: raise HTTPException(status_code=410, detail="File has expired")
         
         file_path = Path(file_doc.file_path)
-        if not file_path.exists():
-            raise HTTPException(status_code=404, detail="File not found on disk")
+        if not file_path.exists(): raise HTTPException(status_code=404, detail="File not found on disk")
         
         return FileResponse(path=file_path, filename=file_doc.filename, media_type=file_doc.content_type)
     except HTTPException:
@@ -329,16 +309,12 @@ async def create_text_share(data: dict, db: AsyncSession = Depends(get_db)):
             share_id=share_id,
             content=data.get("content", ""),
             title=data.get("title", "Shared Note"),
-            # --- MODIFIED: Expiration time changed to 9 minutes ---
-            expires_at=datetime.utcnow() + timedelta(minutes=9)
+            expires_at=datetime.utcnow() + timedelta(minutes=30)
         )
         db.add(new_text_share)
         await db.commit()
         
-        return {
-            "share_id": share_id, "title": new_text_share.title,
-            "content": new_text_share.content, "type": "text"
-        }
+        return {"share_id": share_id, "title": new_text_share.title, "content": new_text_share.content, "type": "text"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -349,15 +325,10 @@ async def get_text_share(share_id: str, db: AsyncSession = Depends(get_db)):
         result = await db.execute(query)
         text_doc = result.scalars().first()
         
-        if not text_doc:
-            raise HTTPException(status_code=404, detail="Text share not found")
-        if datetime.utcnow() > text_doc.expires_at:
-            raise HTTPException(status_code=410, detail="Text share has expired")
+        if not text_doc: raise HTTPException(status_code=404, detail="Text share not found")
+        if datetime.utcnow() > text_doc.expires_at: raise HTTPException(status_code=410, detail="Text share has expired")
         
-        return {
-            "share_id": text_doc.share_id, "title": text_doc.title,
-            "content": text_doc.content, "created_at": text_doc.created_at.isoformat()
-        }
+        return {"share_id": text_doc.share_id, "title": text_doc.title, "content": text_doc.content, "created_at": text_doc.created_at.isoformat()}
     except HTTPException:
         raise
     except Exception as e:
