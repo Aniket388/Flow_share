@@ -244,7 +244,7 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str):
         manager.disconnect(user_id)
         await manager.broadcast_user_list()
 
-@app.get("/api/health")
+@app.api_route("/api/health", methods=["GET", "HEAD"])
 async def health_check():
     return {"status": "healthy", "service": "FlowShare P2P"}
 
