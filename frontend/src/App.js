@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import { Upload, Users, Send, FileText, Wifi, Loader2, Download, Copy, X, CheckCircle, ShieldAlert } from 'lucide-react';
-import { toast } from 'sonner';
+import { Upload, Users, Send, FileText, Wifi, Loader2, Download, Copy, X, CheckCircle, ShieldAlert, WifiOff } from 'lucide-react'; 
+import { Toaster, toast } from 'sonner';
 import { Button } from './components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './components/ui/card';
 import { Textarea } from './components/ui/textarea';
@@ -9,7 +9,6 @@ import { Badge } from './components/ui/badge';
 import { Progress } from './components/ui/progress';
 import './App.css';
 
-// NEW: Expanded list of random error messages
 const sizeErrorMessages = [
     "This file is too heavy for even the Hulk!",
     "S.H.I.E.L.D. protocols limit transfers to 100MB.",
@@ -36,6 +35,25 @@ const sizeErrorMessages = [
     "I love you 3000, but I don't love files over 100MB.",
     "This file is too big to fit in the Quantum Realm. Please shrink it to under 100MB.",
     "Cerebro has detected a file with a power signature that is off the charts. Max capacity is 100MB."
+];
+
+// NEW: Superhero-themed timeout messages
+const timeoutErrorMessages = [
+  "The Bifrost connection is unstable! Upload timed out.",
+  "Strange can't keep the portal open this long. Upload timed out.",
+  "Thanos snapped... and so did your upload. Timed out!",
+  "Loki's mischief is messing with our servers. Upload timed out.",
+  "SHIELD's satellites lost the signal. Upload timed out.",
+  "Ultron hijacked the network again. Upload timed out.",
+  "Even with super speed, this connection is too slow. Upload timed out.",
+  "Looks like we hit a time-dilation field. Upload timed out.",
+  "Our communications with the Wakandan network are experiencing lag. Too slow to upload.",
+  "The cosmic data stream is congested. Upload timed out.",
+  "Fury says the connection is compromised! Too slow to upload.",
+  "This upload is taking longer than a Pym Particle re-calibration. Timed out!",
+  "Even with a power stone, we can't speed up this connection. Upload timed out.",
+  "The timelines are not aligning for this upload. Timed out!",
+  "JARVIS reports a network anomaly. Upload timed out."
 ];
 
 const App = () => {
@@ -210,6 +228,7 @@ const App = () => {
           const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total);
           setUploadProgress(progress);
         },
+        timeout: 35000, 
       });
       
       setCurrentShare(response.data);
@@ -218,8 +237,19 @@ const App = () => {
       toast.success('File uploaded! Now choose who to send it to.');
       
     } catch (error) {
-      const errorMessage = error.response?.data?.detail || 'Failed to upload file. Please try again.';
-      toast.error(errorMessage, { icon: <ShieldAlert className="w-5 h-5" /> });
+      if (error.code === 'ECONNABORTED') {
+        // MODIFIED: Use superhero-themed timeout messages
+        const randomIndex = Math.floor(Math.random() * timeoutErrorMessages.length);
+        const randomMessage = timeoutErrorMessages[randomIndex];
+
+        toast.error(randomMessage, {
+          description: "The upload took too long. Please try again with a faster network.",
+          icon: <WifiOff className="w-5 h-5" />,
+        });
+      } else {
+        const errorMessage = error.response?.data?.detail || 'Failed to upload file. Please try again.';
+        toast.error(errorMessage, { icon: <ShieldAlert className="w-5 h-5" /> });
+      }
       console.error('Upload error:', error);
     } finally {
       setIsUploading(false);
@@ -343,9 +373,9 @@ const App = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 text-white font-sans">
-      {/* REMOVED: Toaster component deleted from here to fix the duplicate notification issue. */}
+      <Toaster richColors position="top-right" theme="dark" />
       <div className="container mx-auto px-4 py-8 max-w-4xl">
-        {/* Header */}
+        {/* Header and other components... */}
         <div className="text-center mb-12">
           <h1 className="text-6xl font-bold bg-gradient-to-r from-red-400 via-yellow-400 to-blue-400 bg-clip-text text-transparent mb-4">
             FlowShare
@@ -369,7 +399,6 @@ const App = () => {
           </div>
         </div>
 
-        {/* Main Content */}
         <div className="grid md:grid-cols-2 gap-8">
           <Card className="bg-slate-800/50 border-slate-700 backdrop-blur-sm">
             <CardHeader><CardTitle className="text-white flex items-center gap-2"><Upload className="w-5 h-5" /> Share a File</CardTitle></CardHeader>
@@ -435,49 +464,7 @@ const App = () => {
             )}
           </CardContent>
         </Card>
-
-        {showShareModal && currentShare && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-            <Card className="bg-slate-800 border-slate-700 w-full max-w-lg">
-              <CardHeader>
-                <div className="flex justify-between items-center">
-                    <CardTitle className="text-white">Share Your {currentShare.type === 'file' ? 'File' : 'Note'}</CardTitle>
-                    <Button onClick={() => setShowShareModal(false)} variant="ghost" size="sm" className="text-gray-400 hover:text-white"><X className="w-4 h-4" /></Button>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="p-4 bg-slate-700/50 rounded-lg"><p className="text-white font-medium truncate">{currentShare.type === 'file' ? currentShare.filename : currentShare.title}</p></div>
-                <div className="space-y-2">
-                    <h3 className="text-white font-semibold flex items-center gap-2"><Users className="w-5 h-5" />Confirm or Change Recipients</h3>
-                    {connectedUsers.length === 0 ? (
-                        <p className="text-gray-400 text-center py-4">No other heroes are online to share with.</p>
-                    ) : (
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-2 max-h-48 overflow-y-auto p-1">
-                            {connectedUsers.map((user) => (
-                            <div key={user.user_id} className={`p-2 rounded-lg border text-center cursor-pointer transition-all duration-200 ${modalSelectedUsers.has(user.user_id) ? 'border-blue-400 bg-blue-400/20 text-white' : 'border-slate-600 hover:border-slate-500 bg-slate-700/50 text-gray-300'}`} onClick={() => toggleModalUserSelection(user)}>
-                                {user.character}
-                            </div>
-                            ))}
-                        </div>
-                    )}
-                </div>
-                <p className="text-gray-300 text-sm pt-2">Final selection: {modalSelectedUsers.size} hero{modalSelectedUsers.size !== 1 ? 's' : ''}</p>
-                <div className="flex gap-2">
-                  <Button onClick={handleShareNow} disabled={modalSelectedUsers.size === 0} className="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700">
-                    <Send className="w-4 h-4 mr-2" />
-                    Share Now
-                  </Button>
-                  <Button onClick={() => setShowShareModal(false)} variant="outline" className="border-slate-600 text-gray-300 hover:bg-slate-700">
-                    Cancel
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-
-        {/* REMOVED: The old Receive Modal is no longer needed. */}
-
+        
       </div>
     </div>
   );
