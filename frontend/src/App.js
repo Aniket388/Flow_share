@@ -31,7 +31,7 @@ const sizeErrorMessages = [
 "I can do this all day. But I can't upload a file over 100MB.",
 "On your left... is a smaller file, I hope. This one exceeds the 100MB limit.",
 "This file is too big. I don't feel so good... Try something under 100MB.",
-"I went forward in time to view 14,000,605 futures. In none of them does this upload succeed. (File must be under 100MB).",
+"I went forward in time to view 14,000,605 futures. In none of them does this upload succeed.",
 "That's my secret, Cap. I'm always angry... at files over 100MB.",
 "I love you 3000, but I don't love files over 100MB.",
 "This file is too big to fit in the Quantum Realm. Please shrink it to under 100MB.",
