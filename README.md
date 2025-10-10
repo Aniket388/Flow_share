@@ -52,13 +52,11 @@ Open a Private Comms Channel (Chat):
 Want to chat one-on-one? Find the hero in the list and click the small message icon next to their name.
 
 This sends them a private chat invitation. They'll get a notification with "Accept" or "Decline" options.
-
 If they hit Accept, a private chat window pops up for both of you, and you can message each other in real-time. If they decline, no window appears.
 
 Receiving a Package:
 
 When someone sends you something, you'll get a pop-up notification.
-
 If it's a file or a bundle of files, you'll see a download button for each one. If it's a note, you'll get a button to copy the text right to your clipboard.
 
 
