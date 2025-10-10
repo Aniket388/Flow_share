@@ -120,7 +120,7 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
 
 # Marvel characters list
 MARVEL_CHARACTERS = [
-    "Iron Man", "Captain America", "Thor", "Hulk", "Black Widow", "Hawkeye", "Spider-Man", "Doctor Strange", "Scarlet Witch", "Captain Marvel", "Black Panther", "Falcon", "Winter Soldier", "Ant-Man", "Wasp", "Star-Lord", "Gamora", "Drax", "Rocket Raccoon", "Groot", "Nebula", "Loki", "Vision", "War Machine", "Quicksilver", "Shuri", "Okoye", "Valkyrie", "Ms. Marvel (Kamala Khan)", "She-Hulk", "Moon Knight", "Daredevil", "Jessica Jones", "Luke Cage", "Iron Fist", "Punisher", "Ghost Rider", "Wolverine", "Mr. Fantastic", "Black Bolt", "Cyclops", "Jean Grey", "Professor X", "Invisible Woman", "Silver Surfer", "Gambit", "Rogue", "Namor", "Blade", "Human Torch", "Storm", "The Thing", "Nova", "Nightcrawler", "Beast", "Cable", "Elektra", "Cloak", "Dagger", "Spider-Woman", "Colossus", "Psylocke", "Iceman", "Emma Frost", "Angel", "Domino", "Medusa", "Jubilee", "Kitty Pryde", "Miles Morales", "Magik", "Nick Fury", "Havok", "X-23", "Adam Warlock", "Sentry", "Red Hulk", "Wonder Man", "Spider-Gwen", "Songbird", "Goliath", "Hercules", "Dazzler", "Crystal", "Captain Britain", "Beta Ray Bill", "Anti-Venom", "Bishop", "Clea", "Firestar", "Lockjaw", "Agent Venom", "Polaris", "Black Knight", "White Tiger", "Elsa Bloodstone", "Ka-Zar", "Man-Thing", "Heimdall", "Lady Sif", "Mockingbird", "Odin", "Shang-Chi"
+    "Iron Man", "Captain America", "Thor", "Hulk", "Black Widow", "Hawkeye", "Spider-Man", "Doctor Strange", "Scarlet Witch", "Captain Marvel", "Black Panther", "Falcon", "Winter Soldier", "Ant-Man", "Wasp", "Star-Lord", "Gamora", "Drax", "Rocket Raccoon", "Groot", "Nebula", "Loki", "Vision", "War Machine", "Quicksilver", "Shuri", "Okoye", "Valkyrie", "Ms. Marvel (Kamala Khan)", "She-Hulk", "Moon Knight", "Daredevil", "Jessica Jones", "Luke Cage", "Iron Fist", "Punisher", "Ghost Rider", "W Wolverine", "Mr. Fantastic", "Black Bolt", "Cyclops", "Jean Grey", "Professor X", "Invisible Woman", "Silver Surfer", "Gambit", "Rogue", "Namor", "Blade", "Human Torch", "Storm", "The Thing", "Nova", "Nightcrawler", "Beast", "Cable", "Elektra", "Cloak", "Dagger", "Spider-Woman", "Colossus", "Psylocke", "Iceman", "Emma Frost", "Angel", "Domino", "Medusa", "Jubilee", "Kitty Pryde", "Miles Morales", "Magik", "Nick Fury", "Havok", "X-23", "Adam Warlock", "Sentry", "Red Hulk", "Wonder Man", "Spider-Gwen", "Songbird", "Goliath", "Hercules", "Dazzler", "Crystal", "Captain Britain", "Beta Ray Bill", "Anti-Venom", "Bishop", "Clea", "Firestar", "Lockjaw", "Agent Venom", "Polaris", "Black Knight", "White Tiger", "Elsa Bloodstone", "Ka-Zar", "Man-Thing", "Heimdall", "Lady Sif", "Mockingbird", "Odin", "Shang-Chi"
 ]
 
 class ConnectionManager:
@@ -167,7 +167,8 @@ class ConnectionManager:
                 success_count += 1
         if success_count > 0:
             await self.send_personal_message(from_user_id, {'type': 'share_success', 'message': f'Successfully shared with {success_count} hero{"s" if success_count > 1 else ""}!', 'success_count': success_count})
-
+    
+    # NEW: Chat-related functions
     async def send_private_message(self, from_user_id: str, to_user_id: str, content: str):
         from_character = self.user_sessions.get(from_user_id, {}).get('character', 'Unknown')
         message = {'type': 'private_message', 'from_user_id': from_user_id, 'to_user_id': to_user_id, 'from_character': from_character, 'content': content, 'timestamp': datetime.utcnow().isoformat()}
@@ -184,11 +185,12 @@ class ConnectionManager:
         message = {'type': response_type, 'from_user_id': from_user_id, 'from_character': from_character}
         if to_user_id in self.active_connections: await self.send_personal_message(to_user_id, message)
 
+
 manager = ConnectionManager()
 UPLOAD_DIR = Path("/tmp/flowshare_files")
 UPLOAD_DIR.mkdir(exist_ok=True)
 
-# MODIFIED: Corrected the WebSocket endpoint logic
+
 @app.websocket("/api/ws/{user_id}")
 async def websocket_endpoint(websocket: WebSocket, user_id: str):
     await manager.connect(websocket, user_id)
@@ -209,7 +211,7 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str):
                 await manager.handle_chat_response(user_id, message.get('to_user_id'), msg_type)
 
     except WebSocketDisconnect:
-        pass # The finally block will handle cleanup
+        pass
     finally:
         manager.disconnect(user_id)
         await manager.broadcast_user_list()
@@ -217,7 +219,6 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str):
 @app.api_route("/api/health", methods=["GET", "HEAD"])
 async def health_check(): return {"status": "healthy", "service": "FlowShare"}
 
-# All other endpoints (upload, download, etc.) remain unchanged
 @app.post("/api/upload")
 async def upload_file(file: UploadFile = File(...), db: AsyncSession = Depends(get_db)):
     try:
