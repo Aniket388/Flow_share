@@ -6,6 +6,7 @@ Let's be honest: sharing files online can be a real pain. You're either wrestlin
 Think of it as your own private S.H.I.E.L.D. network, but for your files. It’s the over-engineered solution for your simple sharing problems you never knew you needed. There are no accounts, no logins, and no waiting. Just pure, unadulterated sharing magic.
 
 When you connect, you're not just a "user"—you're an Avenger. The system assigns you a random Marvel codename, and you instantly see every other hero currently online.
+________________________________________________________________________________________________________________________________________________________________________________
 
 Key Features & Superpowers:
 
@@ -17,6 +18,7 @@ Private Comms Channel: Need to coordinate your mission? Open a secure, one-on-on
 
 Hero Reconnaissance: The user list is live and buzzing. And if you can't find your target, the search bar is your own personal Cerebro, filtering through every hero online instantly.
 
+_____________________________________________________________________________________________________________________________________________________________________________________
 
 The Stark Tech Under the Hood:
 
@@ -31,7 +33,7 @@ The Memory (Database): A rock-solid PostgreSQL database managed with SQLAlchemy 
 The Global Infrastructure: The React UI is deployed on Netlify's edge network for insane speed, while the FastAPI brain and its PostgreSQL memory live happily together on Render.
 
 So go ahead. Share something. It's what heroes do.
-
+__________________________________________________________________________________________________________________________________________________________________________
 How It Works: Your Mission Briefing:
 
 Using FlowShare is dead simple. No sign-ups, no nonsense.
