@@ -325,9 +325,9 @@ const App = () => {
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 text-white font-sans">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 text-white font-sans flex flex-col">
       <Toaster richColors position="top-right" theme="dark" />
-      <div className="container mx-auto px-4 py-8 max-w-4xl">
+      <div className="flex-grow container mx-auto px-4 py-8 max-w-4xl">
         <div className="text-center mb-12">
             <h1 className="text-6xl font-bold bg-gradient-to-r from-red-400 via-yellow-400 to-blue-400 bg-clip-text text-transparent mb-4">FlowShare</h1>
             <p className="text-gray-300 text-xl">Marvel Share Network</p>
@@ -384,7 +384,7 @@ const App = () => {
         </Card>
         
         {showShareModal && currentShare && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50"><Card className="bg-slate-800 border-slate-700 w-full max-w-lg"><CardHeader><div className="flex justify-between items-center"><CardTitle className="text-white">Share Your {currentShare.type === 'file' ? 'File' : currentShare.type === 'bundle' ? 'Files' : 'Note'}</CardTitle><Button onClick={() => setShowShareModal(false)} variant="ghost" size="sm" className="text-gray-400 hover:text-white"><X className="w-4 h-4" /></Button></div></CardHeader><CardContent className="space-y-4">
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50"><Card className="bg-slate-800 border-slate-700 w-full max-w-lg"><CardHeader><div className="flex justify-between items-center"><CardTitle className="text-white">Share Your {currentShare.type === 'file' ? 'File' : currentShare.type === 'bundle' ? `${currentShare.files.length} Files` : 'Note'}</CardTitle><Button onClick={() => setShowShareModal(false)} variant="ghost" size="sm" className="text-gray-400 hover:text-white"><X className="w-4 h-4" /></Button></div></CardHeader><CardContent className="space-y-4">
             <div className="p-4 bg-slate-700/50 rounded-lg max-h-40 overflow-y-auto space-y-2">
               {currentShare.type === 'bundle' ? (
                 currentShare.files.map((file, index) => (
@@ -412,15 +412,15 @@ const App = () => {
                       <div className="space-y-3">
                         <h3 className="text-lg font-semibold text-white flex items-center gap-2"><Files className="w-5 h-5"/> File Bundle ({receivedShare.share_data.files.length})</h3>
                         {receivedShare.share_data.files.map(file => (
-                          <div key={file.file_id} className="flex items-center justify-between gap-3 bg-slate-900/50 p-2 rounded">
-                            <div className="flex items-center gap-3">
-                              <span className="text-xl">{getFileIcon(file.filename)}</span>
-                              <div>
-                                <p className="text-white font-medium text-sm">{file.filename}</p>
+                          <div key={file.file_id} className="flex items-center justify-between gap-3 bg-slate-800/60 p-2 rounded">
+                            <div className="flex items-center gap-3 overflow-hidden">
+                              <span className="text-xl flex-shrink-0">{getFileIcon(file.filename)}</span>
+                              <div className="overflow-hidden">
+                                <p className="text-white font-medium text-sm truncate">{file.filename}</p>
                                 <p className="text-gray-400 text-xs">{file.size ? `${Math.round(file.size / 1024)} KB` : ''}</p>
                               </div>
                             </div>
-                            <Button onClick={() => handleDownloadFile(file)} disabled={isDownloading} size="sm" className="bg-blue-600 hover:bg-blue-700"><Download className="w-4 h-4" /></Button>
+                            <Button onClick={() => handleDownloadFile(file)} disabled={isDownloading} size="sm" className="bg-blue-600 hover:bg-blue-700 flex-shrink-0"><Download className="w-4 h-4" /></Button>
                           </div>
                         ))}
                       </div>
@@ -438,7 +438,7 @@ const App = () => {
                     ) : (
                       <div>
                         <p className="text-white font-medium mb-2">{receivedShare.share_data.title}</p>
-                        <p className="text-gray-300 text-sm">{receivedShare.share_data.content}</p>
+                        <p className="text-gray-300 text-sm max-h-32 overflow-y-auto">{receivedShare.share_data.content}</p>
                       </div>
                     )}
                   </div>
@@ -466,7 +466,6 @@ const App = () => {
                                         <div className="flex items-start gap-2.5">
                                             <div className="bg-blue-600 text-white p-3 rounded-lg max-w-xs md:max-w-md rounded-br-none">
                                                 <p className="text-sm" style={{ wordBreak: 'break-word' }}>{msg.content}</p>
-
                                             </div>
                                             <Badge variant="secondary" className="bg-blue-600 text-white w-8 h-8 flex items-center justify-center flex-shrink-0">{myCharacter.charAt(0)}</Badge>
                                         </div>
