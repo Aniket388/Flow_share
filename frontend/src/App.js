@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import { Upload, Users, Send, FileText, Wifi, Loader2, Download, Copy, X, CheckCircle, ShieldAlert, WifiOff, MessageSquare, Search } from 'lucide-react';
+import { Upload, Users, Send, FileText, Wifi, Loader2, Download, Copy, X, CheckCircle, ShieldAlert, WifiOff, MessageSquare, Search, Files } from 'lucide-react';
 import { Toaster, toast } from 'sonner';
 import { Button } from './components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './components/ui/card';
@@ -173,35 +173,43 @@ const App = () => {
     toast.error(`${from_character} declined your chat request.`);
   };
 
-  const handleFileUpload = async (file) => {
-    if (!file) return;
+  const handleFileUpload = async (files) => {
+    if (!files || files.length === 0) return;
+
     const MAX_FILE_SIZE = 100 * 1024 * 1024;
-    if (file.size > MAX_FILE_SIZE) {
+    const totalSize = Array.from(files).reduce((acc, file) => acc + file.size, 0);
+
+    if (totalSize > MAX_FILE_SIZE) {
       const randomMessage = sizeErrorMessages[Math.floor(Math.random() * sizeErrorMessages.length)];
-      toast.error(randomMessage, { icon: <ShieldAlert className="w-5 h-5" />, description: `Your file is ${Math.round(file.size / (1024*1024))}MB. Please keep it under 100MB.`});
+      toast.error(randomMessage, { icon: <ShieldAlert className="w-5 h-5" />, description: `Total size is ${Math.round(totalSize / (1024*1024))}MB. Please keep it under 100MB.`});
       if (fileInputRef.current) { fileInputRef.current.value = null; }
       return;
     }
+    
     setIsUploading(true);
     setUploadProgress(0);
     try {
       const formData = new FormData();
-      formData.append('file', file);
+      Array.from(files).forEach(file => {
+        formData.append('files', file);
+      });
+
       const response = await axios.post(`${backendUrl}/api/upload`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
         onUploadProgress: (e) => setUploadProgress(Math.round((e.loaded * 100) / e.total)),
-        timeout: 35000,
+        timeout: 60000, 
       });
+      
       setCurrentShare(response.data);
       setModalSelectedUsers(new Set(selectedUsers));
       setShowShareModal(true);
-      toast.success('File uploaded! Now choose who to send it to.');
+      toast.success(`${files.length} file(s) uploaded! Now choose who to send them to.`);
     } catch (error) {
       if (error.code === 'ECONNABORTED') {
         const randomMessage = timeoutErrorMessages[Math.floor(Math.random() * timeoutErrorMessages.length)];
         toast.error(randomMessage, { description: "The upload took too long. Please try again with a faster network.", icon: <WifiOff className="w-5 h-5" /> });
       } else {
-        const errorMessage = error.response?.data?.detail || 'Failed to upload file. Please try again.';
+        const errorMessage = error.response?.data?.detail || `Failed to upload file(s). Please try again.`;
         toast.error(errorMessage, { icon: <ShieldAlert className="w-5 h-5" /> });
       }
       console.error('Upload error:', error);
@@ -265,24 +273,24 @@ const App = () => {
     } catch (error) { toast.error('Could not copy text.'); }
   };
 
-  const handleDownloadFile = async () => {
-    if (!receivedShare?.share_data?.file_id) return;
+  const handleDownloadFile = async (fileToDownload) => {
+    if (!fileToDownload?.file_id) return;
     setIsDownloading(true);
-    toast.info('Starting download...');
+    toast.info(`Starting download for ${fileToDownload.filename}...`);
     try {
-      const response = await axios.get(`${backendUrl}/api/download/${receivedShare.share_data.file_id}`, { responseType: 'blob' });
+      const response = await axios.get(`${backendUrl}/api/download/${fileToDownload.file_id}`, { responseType: 'blob' });
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', receivedShare.share_data.filename);
+      link.setAttribute('download', fileToDownload.filename);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
-      toast.success('File downloaded successfully!');
+      toast.success(`${fileToDownload.filename} downloaded successfully!`);
     } catch (error) {
       console.error('Download error:', error);
-      toast.error('Failed to download file. Please try again.');
+      toast.error(`Failed to download ${fileToDownload.filename}. Please try again.`);
     } finally {
       setIsDownloading(false);
     }
@@ -308,7 +316,7 @@ const App = () => {
   };
 
   const handleDrag = (e) => { e.preventDefault(); e.stopPropagation(); if (e.type === 'dragenter' || e.type === 'dragover') { setDragActive(true); } else if (e.type === 'dragleave') { setDragActive(false); } };
-  const handleDrop = (e) => { e.preventDefault(); e.stopPropagation(); setDragActive(false); if (e.dataTransfer.files && e.dataTransfer.files[0]) { handleFileUpload(e.dataTransfer.files[0]); } };
+  const handleDrop = (e) => { e.preventDefault(); e.stopPropagation(); setDragActive(false); if (e.dataTransfer.files && e.dataTransfer.files.length > 0) { handleFileUpload(e.dataTransfer.files); } };
   const closeReceiveModal = () => { setShowReceiveModal(false); setReceivedShare(null); };
   const getFileIcon = (filename) => { const ext = filename?.split('.').pop()?.toLowerCase(); switch (ext) { case 'pdf': return '📄'; case 'doc': case 'docx': return '📝'; case 'jpg': case 'jpeg': case 'png': case 'gif': return '🖼️'; case 'mp4': case 'mov': return '🎥'; case 'mp3': case 'wav': return '🎵'; default: return '📁'; } };
   
@@ -320,7 +328,6 @@ const App = () => {
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 text-white font-sans">
       <Toaster richColors position="top-right" theme="dark" />
       <div className="container mx-auto px-4 py-8 max-w-4xl">
-        {/* Header and main content cards */}
         <div className="text-center mb-12">
             <h1 className="text-6xl font-bold bg-gradient-to-r from-red-400 via-yellow-400 to-blue-400 bg-clip-text text-transparent mb-4">FlowShare</h1>
             <p className="text-gray-300 text-xl">Marvel Share Network</p>
@@ -328,7 +335,7 @@ const App = () => {
             <div className="flex items-center justify-center gap-2 mt-4"><Wifi className={`w-5 h-5 ${connectionStatus === 'connected' ? 'text-green-400' : 'text-red-400'}`} /><span className={`text-sm ${connectionStatus === 'connected' ? 'text-green-400' : 'text-red-400'}`}>{connectionStatus === 'connected' ? `Connected to network` : 'Connecting...'}</span></div>
         </div>
         <div className="grid md:grid-cols-2 gap-8">
-            <Card className="bg-slate-800/50 border-slate-700 backdrop-blur-sm"><CardHeader><CardTitle className="text-white flex items-center gap-2"><Upload className="w-5 h-5" /> Share a File</CardTitle></CardHeader><CardContent><div className={`border-2 border-dashed rounded-lg p-8 text-center transition-all duration-300 cursor-pointer ${dragActive ? 'border-blue-400 bg-blue-400/10' : 'border-slate-600 hover:border-slate-500'}`} onDragEnter={handleDrag} onDragLeave={handleDrag} onDragOver={handleDrag} onDrop={handleDrop} onClick={() => fileInputRef.current?.click()}>{isUploading ? (<div className="space-y-4"><Loader2 className="w-12 h-12 animate-spin text-blue-400 mx-auto" /><Progress value={uploadProgress} className="w-full" /><p className="text-gray-300">Uploading... {uploadProgress}%</p></div>) : (<><Upload className="w-16 h-16 text-slate-400 mx-auto mb-4" /><p className="text-white text-lg mb-2">Drop files here or click to browse</p><p className="text-gray-400">Any file type supported</p></>)}</div><input ref={fileInputRef} type="file" className="hidden" onChange={(e) => e.target.files && handleFileUpload(e.target.files[0])} /></CardContent></Card>
+            <Card className="bg-slate-800/50 border-slate-700 backdrop-blur-sm"><CardHeader><CardTitle className="text-white flex items-center gap-2"><Upload className="w-5 h-5" /> Share Files</CardTitle></CardHeader><CardContent><div className={`border-2 border-dashed rounded-lg p-8 text-center transition-all duration-300 cursor-pointer ${dragActive ? 'border-blue-400 bg-blue-400/10' : 'border-slate-600 hover:border-slate-500'}`} onDragEnter={handleDrag} onDragLeave={handleDrag} onDragOver={handleDrag} onDrop={handleDrop} onClick={() => fileInputRef.current?.click()}>{isUploading ? (<div className="space-y-4"><Loader2 className="w-12 h-12 animate-spin text-blue-400 mx-auto" /><Progress value={uploadProgress} className="w-full" /><p className="text-gray-300">Uploading... {uploadProgress}%</p></div>) : (<><Upload className="w-16 h-16 text-slate-400 mx-auto mb-4" /><p className="text-white text-lg mb-2">Drop files here or click to browse</p><p className="text-gray-400">Any file type supported</p></>)}</div><input ref={fileInputRef} type="file" className="hidden" onChange={(e) => e.target.files && handleFileUpload(e.target.files)} multiple /></CardContent></Card>
             <Card className="bg-slate-800/50 border-slate-700 backdrop-blur-sm"><CardHeader><CardTitle className="text-white flex items-center gap-2"><FileText className="w-5 h-5" /> Share a Note</CardTitle></CardHeader><CardContent className="space-y-4"><Textarea placeholder="Type your message or paste text here..." value={textContent} onChange={(e) => setTextContent(e.target.value)} className="min-h-[120px] bg-slate-700/50 border-slate-600 text-white placeholder-gray-400" /><Button onClick={handleTextShare} disabled={!textContent.trim()} className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"><FileText className="w-4 h-4 mr-2" /> Share Note</Button></CardContent></Card>
         </div>
         
@@ -377,11 +384,75 @@ const App = () => {
         </Card>
         
         {showShareModal && currentShare && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50"><Card className="bg-slate-800 border-slate-700 w-full max-w-lg"><CardHeader><div className="flex justify-between items-center"><CardTitle className="text-white">Share Your {currentShare.type === 'file' ? 'File' : 'Note'}</CardTitle><Button onClick={() => setShowShareModal(false)} variant="ghost" size="sm" className="text-gray-400 hover:text-white"><X className="w-4 h-4" /></Button></div></CardHeader><CardContent className="space-y-4"><div className="p-4 bg-slate-700/50 rounded-lg"><p className="text-white font-medium truncate">{currentShare.type === 'file' ? currentShare.filename : currentShare.title}</p></div><div className="space-y-2"><h3 className="text-white font-semibold flex items-center gap-2"><Users className="w-5 h-5" />Confirm or Change Recipients</h3>{connectedUsers.length === 0 ? (<p className="text-gray-400 text-center py-4">No other heroes are online.</p>) : (<div className="grid grid-cols-2 md:grid-cols-3 gap-2 max-h-48 overflow-y-auto p-1">{connectedUsers.map((user) => (<div key={user.user_id} className={`p-2 rounded-lg border text-center cursor-pointer transition-all duration-200 ${modalSelectedUsers.has(user.user_id) ? 'border-blue-400 bg-blue-400/20 text-white' : 'border-slate-600 hover:border-slate-500 bg-slate-700/50 text-gray-300'}`} onClick={() => toggleModalUserSelection(user)}>{user.character}</div>))}</div>)}</div><p className="text-gray-300 text-sm pt-2">Final selection: {modalSelectedUsers.size} hero{modalSelectedUsers.size !== 1 ? 's' : ''}</p><div className="flex gap-2"><Button onClick={handleShareNow} disabled={modalSelectedUsers.size === 0} className="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700"><Send className="w-4 h-4 mr-2" /> Share Now</Button><Button onClick={() => setShowShareModal(false)} variant="outline" className="border-slate-600 text-gray-300 hover:bg-slate-700">Cancel</Button></div></CardContent></Card></div>
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50"><Card className="bg-slate-800 border-slate-700 w-full max-w-lg"><CardHeader><div className="flex justify-between items-center"><CardTitle className="text-white">Share Your {currentShare.type === 'file' ? 'File' : currentShare.type === 'bundle' ? 'Files' : 'Note'}</CardTitle><Button onClick={() => setShowShareModal(false)} variant="ghost" size="sm" className="text-gray-400 hover:text-white"><X className="w-4 h-4" /></Button></div></CardHeader><CardContent className="space-y-4">
+            <div className="p-4 bg-slate-700/50 rounded-lg max-h-40 overflow-y-auto space-y-2">
+              {currentShare.type === 'bundle' ? (
+                currentShare.files.map((file, index) => (
+                  <p key={index} className="text-white font-medium truncate">{file.filename}</p>
+                ))
+              ) : (
+                <p className="text-white font-medium truncate">{currentShare.type === 'file' ? currentShare.filename : currentShare.title}</p>
+              )}
+            </div>
+            <div className="space-y-2"><h3 className="text-white font-semibold flex items-center gap-2"><Users className="w-5 h-5" />Confirm or Change Recipients</h3>{connectedUsers.length === 0 ? (<p className="text-gray-400 text-center py-4">No other heroes are online.</p>) : (<div className="grid grid-cols-2 md:grid-cols-3 gap-2 max-h-48 overflow-y-auto p-1">{connectedUsers.map((user) => (<div key={user.user_id} className={`p-2 rounded-lg border text-center cursor-pointer transition-all duration-200 ${modalSelectedUsers.has(user.user_id) ? 'border-blue-400 bg-blue-400/20 text-white' : 'border-slate-600 hover:border-slate-500 bg-slate-700/50 text-gray-300'}`} onClick={() => toggleModalUserSelection(user)}>{user.character}</div>))}</div>)}</div><p className="text-gray-300 text-sm pt-2">Final selection: {modalSelectedUsers.size} hero{modalSelectedUsers.size !== 1 ? 's' : ''}</p><div className="flex gap-2"><Button onClick={handleShareNow} disabled={modalSelectedUsers.size === 0} className="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700"><Send className="w-4 h-4 mr-2" /> Share Now</Button><Button onClick={() => setShowShareModal(false)} variant="outline" className="border-slate-600 text-gray-300 hover:bg-slate-700">Cancel</Button></div></CardContent></Card></div>
         )}
+
         {showReceiveModal && receivedShare && (
-            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50"><Card className="bg-slate-800 border-slate-700 w-full max-w-md"><CardHeader><div className="flex items-center justify-between"><CardTitle className="text-white flex items-center gap-2"><CheckCircle className="w-5 h-5 text-green-400" />{receivedShare.from_character} sent you something!</CardTitle><Button onClick={closeReceiveModal} variant="ghost" size="sm" className="text-gray-400 hover:text-white"><X className="w-4 h-4" /></Button></div></CardHeader><CardContent className="space-y-4"><div className="p-4 bg-slate-700/50 rounded-lg">{receivedShare.share_data.type === 'file' ? (<div className="flex items-center gap-3"><span className="text-2xl">{getFileIcon(receivedShare.share_data.filename)}</span><div><p className="text-white font-medium">{receivedShare.share_data.filename}</p><p className="text-gray-400 text-sm">{receivedShare.share_data.size ? `${Math.round(receivedShare.share_data.size / 1024)} KB` : ''}</p></div></div>) : (<div><p className="text-white font-medium mb-2">{receivedShare.share_data.title}</p><p className="text-gray-300 text-sm max-h-32 overflow-y-auto">{receivedShare.share_data.content}</p></div>)}</div><div className="flex gap-2">{receivedShare.share_data.type === 'file' ? (<Button onClick={handleDownloadFile} disabled={isDownloading} className="flex-1 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700">{isDownloading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />} Download File</Button>) : (<Button onClick={handleCopyText} className="flex-1 bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700"><Copy className="w-4 h-4 mr-2" /> Copy Text</Button>)}<Button onClick={closeReceiveModal} variant="outline" className="border-slate-600 text-gray-300 hover:bg-slate-700">Close</Button></div></CardContent></Card></div>
+             <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+              <Card className="bg-slate-800 border-slate-700 w-full max-w-md">
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-white flex items-center gap-2"><CheckCircle className="w-5 h-5 text-green-400" />{receivedShare.from_character} sent you something!</CardTitle>
+                    <Button onClick={closeReceiveModal} variant="ghost" size="sm" className="text-gray-400 hover:text-white"><X className="w-4 h-4" /></Button>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="p-4 bg-slate-700/50 rounded-lg max-h-60 overflow-y-auto">
+                    {receivedShare.share_data.type === 'bundle' ? (
+                      <div className="space-y-3">
+                        <h3 className="text-lg font-semibold text-white flex items-center gap-2"><Files className="w-5 h-5"/> File Bundle ({receivedShare.share_data.files.length})</h3>
+                        {receivedShare.share_data.files.map(file => (
+                          <div key={file.file_id} className="flex items-center justify-between gap-3 bg-slate-900/50 p-2 rounded">
+                            <div className="flex items-center gap-3">
+                              <span className="text-xl">{getFileIcon(file.filename)}</span>
+                              <div>
+                                <p className="text-white font-medium text-sm">{file.filename}</p>
+                                <p className="text-gray-400 text-xs">{file.size ? `${Math.round(file.size / 1024)} KB` : ''}</p>
+                              </div>
+                            </div>
+                            <Button onClick={() => handleDownloadFile(file)} disabled={isDownloading} size="sm" className="bg-blue-600 hover:bg-blue-700"><Download className="w-4 h-4" /></Button>
+                          </div>
+                        ))}
+                      </div>
+                    ) : receivedShare.share_data.type === 'file' ? (
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <span className="text-2xl">{getFileIcon(receivedShare.share_data.filename)}</span>
+                          <div>
+                            <p className="text-white font-medium">{receivedShare.share_data.filename}</p>
+                            <p className="text-gray-400 text-sm">{receivedShare.share_data.size ? `${Math.round(receivedShare.share_data.size / 1024)} KB` : ''}</p>
+                          </div>
+                        </div>
+                        <Button onClick={() => handleDownloadFile(receivedShare.share_data)} disabled={isDownloading} className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700"><Download className="w-4 h-4 mr-2" /> Download</Button>
+                      </div>
+                    ) : (
+                      <div>
+                        <p className="text-white font-medium mb-2">{receivedShare.share_data.title}</p>
+                        <p className="text-gray-300 text-sm">{receivedShare.share_data.content}</p>
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex gap-2">
+                    {receivedShare.share_data.type === 'text' && (
+                        <Button onClick={handleCopyText} className="flex-1 bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700"><Copy className="w-4 h-4 mr-2" /> Copy Text</Button>
+                    )}
+                    <Button onClick={closeReceiveModal} variant="outline" className="flex-1 border-slate-600 text-gray-300 hover:bg-slate-700">Close</Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
         )}
+        
         {activeChatUser && (
             <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
                 <Card className="bg-slate-800 border-slate-700 w-full max-w-lg h-[70vh] flex flex-col">
