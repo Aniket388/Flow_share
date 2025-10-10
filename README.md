@@ -10,9 +10,13 @@ When you connect, you're not just a "user"—you're an Avenger. The system assig
 Key Features & Superpowers:
 
 Multi-File Teleportation: Got a bunch of files? Drag 'em, drop 'em, and yeet the whole bundle (up to 100MB) across the network in a single, glorious upload.
+
 Instant Intel Drops: Sling text notes, code snippets, or that Wi-Fi password without the ceremony of creating a .txt file.
+
 Private Comms Channel: Need to coordinate your mission? Open a secure, one-on-one, real-time chat with any other hero on the network. Just click the icon and send your request.
+
 Hero Reconnaissance: The user list is live and buzzing. And if you can't find your target, the search bar is your own personal Cerebro, filtering through every hero online instantly.
+
 
 The Stark Tech Under the Hood:
 
