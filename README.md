@@ -46,8 +46,6 @@ Choose Your Target: In the "Available Marvel Heroes" list, just click on the nam
 
 Too many heroes online? Use the search bar at the top right to instantly find who you're looking for.
 
-Confirm & Launch: After you upload a file or create a note, a pop-up appears. It shows what you're sending and who you're sending it to. Happy with your selection? Smash that "Share Now" button. Your package is instantly teleported.
-
 Open a Private Comms Channel (Chat):
 Want to chat one-on-one? Find the hero in the list and click the small message icon next to their name.
 
