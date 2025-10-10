@@ -466,6 +466,7 @@ const App = () => {
                                         <div className="flex items-start gap-2.5">
                                             <div className="bg-blue-600 text-white p-3 rounded-lg max-w-xs md:max-w-md rounded-br-none">
                                                 <p className="text-sm" style={{ wordBreak: 'break-word' }}>{msg.content}</p>
+
                                             </div>
                                             <Badge variant="secondary" className="bg-blue-600 text-white w-8 h-8 flex items-center justify-center flex-shrink-0">{myCharacter.charAt(0)}</Badge>
                                         </div>
@@ -496,6 +497,11 @@ const App = () => {
             </div>
         )}
       </div>
+
+      <footer className="text-center text-gray-500 text-sm p-4">
+        created by Aniket Jain ❤️
+      </footer>
+
     </div>
   );
 };
