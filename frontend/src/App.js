@@ -499,7 +499,7 @@ const App = () => {
       </div>
 
       <footer className="text-center text-gray-500 text-sm p-4">
-        created by Aniket Jain ❤️
+        Created by Aniket Jain ❤️
       </footer>
 
     </div>
