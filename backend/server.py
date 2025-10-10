@@ -120,9 +120,25 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
 
 # Marvel characters list
 MARVEL_CHARACTERS = [
-    "Iron Man", "Captain America", "Thor", "Hulk", "Black Widow", "Hawkeye", "Spider-Man", "Doctor Strange", "Scarlet Witch", "Captain Marvel", "Black Panther", "Falcon", "Winter Soldier", "Ant-Man", "Wasp", "Star-Lord", "Gamora", "Drax", "Rocket Raccoon", "Groot", "Nebula", "Loki", "Vision", "War Machine", "Quicksilver", "Shuri", "Okoye", "Valkyrie", "Ms. Marvel (Kamala Khan)", "She-Hulk", "Moon Knight", "Daredevil", "Jessica Jones", "Luke Cage", "Iron Fist", "Punisher", "Ghost Rider", "W Wolverine", "Mr. Fantastic", "Black Bolt", "Cyclops", "Jean Grey", "Professor X", "Invisible Woman", "Silver Surfer", "Gambit", "Rogue", "Namor", "Blade", "Human Torch", "Storm", "The Thing", "Nova", "Nightcrawler", "Beast", "Cable", "Elektra", "Cloak", "Dagger", "Spider-Woman", "Colossus", "Psylocke", "Iceman", "Emma Frost", "Angel", "Domino", "Medusa", "Jubilee", "Kitty Pryde", "Miles Morales", "Magik", "Nick Fury", "Havok", "X-23", "Adam Warlock", "Sentry", "Red Hulk", "Wonder Man", "Spider-Gwen", "Songbird", "Goliath", "Hercules", "Dazzler", "Crystal", "Captain Britain", "Beta Ray Bill", "Anti-Venom", "Bishop", "Clea", "Firestar", "Lockjaw", "Agent Venom", "Polaris", "Black Knight", "White Tiger", "Elsa Bloodstone", "Ka-Zar", "Man-Thing", "Heimdall", "Lady Sif", "Mockingbird", "Odin", "Shang-Chi"
+    "Iron Man", "Captain America", "Thor", "Hulk", "Black Widow", "Hawkeye", "Spider-Man", 
+    "Doctor Strange", "Scarlet Witch", "Captain Marvel", "Black Panther", "Falcon", 
+    "Winter Soldier", "Ant-Man", "Wasp", "Star-Lord", "Gamora", "Drax", "Rocket Raccoon", 
+    "Groot", "Nebula", "Loki", "Vision", "War Machine", "Quicksilver", "Shuri", "Okoye", 
+    "Valkyrie", "Ms. Marvel (Kamala Khan)", "She-Hulk", "Moon Knight", "Daredevil", 
+    "Jessica Jones", "Luke Cage", "Iron Fist", "Punisher", "Ghost Rider", "Wolverine", 
+    "Mr. Fantastic", "Black Bolt", "Cyclops", "Jean Grey", "Professor X", "Invisible Woman", 
+    "Silver Surfer", "Gambit", "Rogue", "Namor", "Blade", "Human Torch", "Storm", "The Thing", 
+    "Nova", "Nightcrawler", "Beast", "Cable", "Elektra", "Cloak", "Dagger", "Spider-Woman", 
+    "Colossus", "Psylocke", "Iceman", "Emma Frost", "Angel", "Domino", "Medusa", "Jubilee", 
+    "Kitty Pryde", "Miles Morales", "Magik", "Nick Fury", "Havok", "X-23", "Adam Warlock", 
+    "Sentry", "Red Hulk", "Wonder Man", "Spider-Gwen", "Songbird", "Goliath", "Hercules", 
+    "Dazzler", "Crystal", "Captain Britain", "Beta Ray Bill", "Anti-Venom", "Bishop", 
+    "Clea", "Firestar", "Lockjaw", "Agent Venom", "Polaris", "Black Knight", 
+    "White Tiger", "Elsa Bloodstone", "Ka-Zar", "Man-Thing", "Heimdall", "Lady Sif", 
+    "Mockingbird", "Odin", "Shang-Chi"
 ]
 
+# Active WebSocket connections and user sessions
 class ConnectionManager:
     def __init__(self):
         self.active_connections: Dict[str, WebSocket] = {}
