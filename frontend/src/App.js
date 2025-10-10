@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import { Upload, Users, Send, FileText, Wifi, Loader2, Download, Copy, X, CheckCircle, ShieldAlert, WifiOff, MessageSquare } from 'lucide-react'; 
+import { Upload, Users, Send, FileText, Wifi, Loader2, Download, Copy, X, CheckCircle, ShieldAlert, WifiOff, MessageSquare, Search } from 'lucide-react';
 import { Toaster, toast } from 'sonner';
 import { Button } from './components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './components/ui/card';
@@ -62,7 +62,7 @@ const App = () => {
   const [isUploading, setIsUploading] = useState(false);
   const [textContent, setTextContent] = useState('');
   const [connectedUsers, setConnectedUsers] = useState([]);
-  const [selectedUsers, setSelectedUsers] = useState(new Set()); 
+  const [selectedUsers, setSelectedUsers] = useState(new Set());
   const [modalSelectedUsers, setModalSelectedUsers] = useState(new Set());
   const [myCharacter, setMyCharacter] = useState('');
   const [userId] = useState(() => `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
@@ -72,7 +72,8 @@ const App = () => {
   const [showReceiveModal, setShowReceiveModal] = useState(false);
   const [receivedShare, setReceivedShare] = useState(null);
   const [isDownloading, setIsDownloading] = useState(false);
-  
+  const [searchQuery, setSearchQuery] = useState(''); // <-- 1. ADDED STATE
+
   const [chats, setChats] = useState({});
   const [activeChatUser, setActiveChatUser] = useState(null);
   const [currentMessage, setCurrentMessage] = useState('');
@@ -99,12 +100,12 @@ const App = () => {
   const connectWebSocket = () => {
     const wsUrl = backendUrl.replace(/http/g, 'ws') + `/api/ws/${userId}`;
     const ws = new WebSocket(wsUrl);
-    
+
     ws.onopen = () => { setConnectionStatus('connected'); toast.success('Connected to FlowShare network!'); };
     ws.onmessage = (event) => { handleWebSocketMessage(JSON.parse(event.data)); };
     ws.onclose = () => { setConnectionStatus('disconnected'); toast.error('Connection lost. Reconnecting...'); setTimeout(connectWebSocket, 3000); };
     ws.onerror = (error) => { console.error('WebSocket error:', error); setConnectionStatus('error'); toast.error('Connection error. Retrying...'); };
-    
+
     websocketRef.current = ws;
   };
 
@@ -128,15 +129,13 @@ const App = () => {
     setReceivedShare({ ...message });
     setShowReceiveModal(true);
   };
-  
+
   const handlePrivateMessage = (message) => {
     const partnerId = message.from_user_id === userId ? message.to_user_id : message.from_user_id;
     
-    // MODIFIED: This is the critical fix. We now always use the character name
-    // provided by the server in the message itself, which avoids any timing issues.
     const newMessage = {
       sender: message.from_character,
-      content: message.content, 
+      content: message.content,
       timestamp: message.timestamp,
     };
 
@@ -146,7 +145,7 @@ const App = () => {
         toast.info(`💬 New message from ${message.from_character}`);
     }
   };
-  
+
   const handleIncomingChatRequest = ({ from_user_id, from_character }) => {
     toast.message(`Chat request from ${from_character}`, {
         action: {
@@ -169,11 +168,11 @@ const App = () => {
     toast.success(`${from_character} accepted your chat request!`);
     setActiveChatUser({ user_id: from_user_id, character: from_character });
   };
-  
+
   const handleChatDecline = ({ from_character }) => {
     toast.error(`${from_character} declined your chat request.`);
   };
-  
+
   const handleFileUpload = async (file) => {
     if (!file) return;
     const MAX_FILE_SIZE = 100 * 1024 * 1024;
@@ -191,10 +190,10 @@ const App = () => {
       const response = await axios.post(`${backendUrl}/api/upload`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
         onUploadProgress: (e) => setUploadProgress(Math.round((e.loaded * 100) / e.total)),
-        timeout: 35000, 
+        timeout: 35000,
       });
       setCurrentShare(response.data);
-      setModalSelectedUsers(new Set(selectedUsers)); 
+      setModalSelectedUsers(new Set(selectedUsers));
       setShowShareModal(true);
       toast.success('File uploaded! Now choose who to send it to.');
     } catch (error) {
@@ -230,18 +229,18 @@ const App = () => {
 
   const toggleUserSelection = (user) => {
     const newSelection = new Set(selectedUsers);
-    if (newSelection.has(user.user_id)) { newSelection.delete(user.user_id); } 
+    if (newSelection.has(user.user_id)) { newSelection.delete(user.user_id); }
     else { newSelection.add(user.user_id); }
     setSelectedUsers(newSelection);
   };
 
   const toggleModalUserSelection = (user) => {
     const newSelection = new Set(modalSelectedUsers);
-    if (newSelection.has(user.user_id)) { newSelection.delete(user.user_id); } 
+    if (newSelection.has(user.user_id)) { newSelection.delete(user.user_id); }
     else { newSelection.add(user.user_id); }
     setModalSelectedUsers(newSelection);
   };
-  
+
   const handleShareNow = () => {
     if (modalSelectedUsers.size === 0) { toast.error('Please select at least one hero to share with.'); return; }
     if (websocketRef.current && websocketRef.current.readyState === WebSocket.OPEN) {
@@ -312,6 +311,11 @@ const App = () => {
   const handleDrop = (e) => { e.preventDefault(); e.stopPropagation(); setDragActive(false); if (e.dataTransfer.files && e.dataTransfer.files[0]) { handleFileUpload(e.dataTransfer.files[0]); } };
   const closeReceiveModal = () => { setShowReceiveModal(false); setReceivedShare(null); };
   const getFileIcon = (filename) => { const ext = filename?.split('.').pop()?.toLowerCase(); switch (ext) { case 'pdf': return '📄'; case 'doc': case 'docx': return '📝'; case 'jpg': case 'jpeg': case 'png': case 'gif': return '🖼️'; case 'mp4': case 'mov': return '🎥'; case 'mp3': case 'wav': return '🎵'; default: return '📁'; } };
+  
+  // <-- 2. ADDED FILTERING LOGIC
+  const filteredUsers = connectedUsers.filter(user =>
+    user.character.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 text-white font-sans">
@@ -328,16 +332,57 @@ const App = () => {
             <Card className="bg-slate-800/50 border-slate-700 backdrop-blur-sm"><CardHeader><CardTitle className="text-white flex items-center gap-2"><Upload className="w-5 h-5" /> Share a File</CardTitle></CardHeader><CardContent><div className={`border-2 border-dashed rounded-lg p-8 text-center transition-all duration-300 cursor-pointer ${dragActive ? 'border-blue-400 bg-blue-400/10' : 'border-slate-600 hover:border-slate-500'}`} onDragEnter={handleDrag} onDragLeave={handleDrag} onDragOver={handleDrag} onDrop={handleDrop} onClick={() => fileInputRef.current?.click()}>{isUploading ? (<div className="space-y-4"><Loader2 className="w-12 h-12 animate-spin text-blue-400 mx-auto" /><Progress value={uploadProgress} className="w-full" /><p className="text-gray-300">Uploading... {uploadProgress}%</p></div>) : (<><Upload className="w-16 h-16 text-slate-400 mx-auto mb-4" /><p className="text-white text-lg mb-2">Drop files here or click to browse</p><p className="text-gray-400">Any file type supported</p></>)}</div><input ref={fileInputRef} type="file" className="hidden" onChange={(e) => e.target.files && handleFileUpload(e.target.files[0])} /></CardContent></Card>
             <Card className="bg-slate-800/50 border-slate-700 backdrop-blur-sm"><CardHeader><CardTitle className="text-white flex items-center gap-2"><FileText className="w-5 h-5" /> Share a Note</CardTitle></CardHeader><CardContent className="space-y-4"><Textarea placeholder="Type your message or paste text here..." value={textContent} onChange={(e) => setTextContent(e.target.value)} className="min-h-[120px] bg-slate-700/50 border-slate-600 text-white placeholder-gray-400" /><Button onClick={handleTextShare} disabled={!textContent.trim()} className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"><FileText className="w-4 h-4 mr-2" /> Share Note</Button></CardContent></Card>
         </div>
+        
+        {/* <-- 3. REPLACED THIS ENTIRE CARD --> */}
         <Card className="mt-8 bg-slate-800/50 border-slate-700 backdrop-blur-sm">
-          <CardHeader><CardTitle className="text-white flex items-center gap-2"><Users className="w-5 h-5" /> Available Marvel Heroes ({connectedUsers.length})</CardTitle></CardHeader>
-          <CardContent>{connectedUsers.length === 0 ? (<p className="text-gray-400 text-center py-8">No other heroes online.</p>) : (<div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">{connectedUsers.map((user) => (<div key={user.user_id} className={`p-3 rounded-lg border cursor-pointer transition-all duration-200 ${selectedUsers.has(user.user_id) ? 'border-blue-400 bg-blue-400/20' : 'border-slate-600 hover:border-slate-500 bg-slate-700/50'}`} onClick={() => toggleUserSelection(user)}><Badge variant="secondary" className="w-full justify-center flex gap-2 items-center"><button onClick={(e) => { e.stopPropagation(); sendChatRequest(user); }} className="hover:text-blue-400 p-1 -m-1" title={`Chat with ${user.character}`}><MessageSquare className="w-4 h-4"/></button><span>{user.character}</span></Badge></div>))}</div>)}</CardContent>
+            <CardHeader>
+                <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
+                <CardTitle className="text-white flex items-center gap-2">
+                    <Users className="w-5 h-5" /> Available Marvel Heroes ({connectedUsers.length})
+                </CardTitle>
+                <div className="relative">
+                    <Input 
+                    type="search" 
+                    placeholder="Search for a hero..." 
+                    className="w-full sm:w-64 bg-slate-700/50 border-slate-600 pl-8"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    />
+                    <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                </div>
+                </div>
+            </CardHeader>
+            <CardContent>
+                {connectedUsers.length === 0 ? (
+                <p className="text-gray-400 text-center py-8">No other heroes online.</p>
+                ) : filteredUsers.length === 0 ? (
+                <p className="text-gray-400 text-center py-8">No hero found matching "{searchQuery}".</p>
+                ) : (
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                    {filteredUsers.map((user) => (
+                    <div 
+                        key={user.user_id} 
+                        className={`p-3 rounded-lg border cursor-pointer transition-all duration-200 ${selectedUsers.has(user.user_id) ? 'border-blue-400 bg-blue-400/20' : 'border-slate-600 hover:border-slate-500 bg-slate-700/50'}`} 
+                        onClick={() => toggleUserSelection(user)}
+                    >
+                        <Badge variant="secondary" className="w-full justify-center flex gap-2 items-center">
+                        <button onClick={(e) => { e.stopPropagation(); sendChatRequest(user); }} className="hover:text-blue-400 p-1 -m-1" title={`Chat with ${user.character}`}>
+                            <MessageSquare className="w-4 h-4"/>
+                        </button>
+                        <span>{user.character}</span>
+                        </Badge>
+                    </div>
+                    ))}
+                </div>
+                )}
+            </CardContent>
         </Card>
         
         {showShareModal && currentShare && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50"><Card className="bg-slate-800 border-slate-700 w-full max-w-lg"><CardHeader><div className="flex justify-between items-center"><CardTitle className="text-white">Share Your {currentShare.type === 'file' ? 'File' : 'Note'}</CardTitle><Button onClick={() => setShowShareModal(false)} variant="ghost" size="sm" className="text-gray-400 hover:text-white"><X className="w-4 h-4" /></Button></div></CardHeader><CardContent className="space-y-4"><div className="p-4 bg-slate-700/50 rounded-lg"><p className="text-white font-medium truncate">{currentShare.type === 'file' ? currentShare.filename : currentShare.title}</p></div><div className="space-y-2"><h3 className="text-white font-semibold flex items-center gap-2"><Users className="w-5 h-5" />Confirm or Change Recipients</h3>{connectedUsers.length === 0 ? (<p className="text-gray-400 text-center py-4">No other heroes are online.</p>) : (<div className="grid grid-cols-2 md:grid-cols-3 gap-2 max-h-48 overflow-y-auto p-1">{connectedUsers.map((user) => (<div key={user.user_id} className={`p-2 rounded-lg border text-center cursor-pointer transition-all duration-200 ${modalSelectedUsers.has(user.user_id) ? 'border-blue-400 bg-blue-400/20 text-white' : 'border-slate-600 hover:border-slate-500 bg-slate-700/50 text-gray-300'}`} onClick={() => toggleModalUserSelection(user)}>{user.character}</div>))}</div>)}</div><p className="text-gray-300 text-sm pt-2">Final selection: {modalSelectedUsers.size} hero{modalSelectedUsers.size !== 1 ? 's' : ''}</p><div className="flex gap-2"><Button onClick={handleShareNow} disabled={modalSelectedUsers.size === 0} className="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700"><Send className="w-4 h-4 mr-2" /> Share Now</Button><Button onClick={() => setShowShareModal(false)} variant="outline" className="border-slate-600 text-gray-300 hover:bg-slate-700">Cancel</Button></div></CardContent></Card></div>
         )}
         {showReceiveModal && receivedShare && (
-           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50"><Card className="bg-slate-800 border-slate-700 w-full max-w-md"><CardHeader><div className="flex items-center justify-between"><CardTitle className="text-white flex items-center gap-2"><CheckCircle className="w-5 h-5 text-green-400" />{receivedShare.from_character} sent you something!</CardTitle><Button onClick={closeReceiveModal} variant="ghost" size="sm" className="text-gray-400 hover:text-white"><X className="w-4 h-4" /></Button></div></CardHeader><CardContent className="space-y-4"><div className="p-4 bg-slate-700/50 rounded-lg">{receivedShare.share_data.type === 'file' ? (<div className="flex items-center gap-3"><span className="text-2xl">{getFileIcon(receivedShare.share_data.filename)}</span><div><p className="text-white font-medium">{receivedShare.share_data.filename}</p><p className="text-gray-400 text-sm">{receivedShare.share_data.size ? `${Math.round(receivedShare.share_data.size / 1024)} KB` : ''}</p></div></div>) : (<div><p className="text-white font-medium mb-2">{receivedShare.share_data.title}</p><p className="text-gray-300 text-sm max-h-32 overflow-y-auto">{receivedShare.share_data.content}</p></div>)}</div><div className="flex gap-2">{receivedShare.share_data.type === 'file' ? (<Button onClick={handleDownloadFile} disabled={isDownloading} className="flex-1 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700">{isDownloading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />} Download File</Button>) : (<Button onClick={handleCopyText} className="flex-1 bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700"><Copy className="w-4 h-4 mr-2" /> Copy Text</Button>)}<Button onClick={closeReceiveModal} variant="outline" className="border-slate-600 text-gray-300 hover:bg-slate-700">Close</Button></div></CardContent></Card></div>
+            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50"><Card className="bg-slate-800 border-slate-700 w-full max-w-md"><CardHeader><div className="flex items-center justify-between"><CardTitle className="text-white flex items-center gap-2"><CheckCircle className="w-5 h-5 text-green-400" />{receivedShare.from_character} sent you something!</CardTitle><Button onClick={closeReceiveModal} variant="ghost" size="sm" className="text-gray-400 hover:text-white"><X className="w-4 h-4" /></Button></div></CardHeader><CardContent className="space-y-4"><div className="p-4 bg-slate-700/50 rounded-lg">{receivedShare.share_data.type === 'file' ? (<div className="flex items-center gap-3"><span className="text-2xl">{getFileIcon(receivedShare.share_data.filename)}</span><div><p className="text-white font-medium">{receivedShare.share_data.filename}</p><p className="text-gray-400 text-sm">{receivedShare.share_data.size ? `${Math.round(receivedShare.share_data.size / 1024)} KB` : ''}</p></div></div>) : (<div><p className="text-white font-medium mb-2">{receivedShare.share_data.title}</p><p className="text-gray-300 text-sm max-h-32 overflow-y-auto">{receivedShare.share_data.content}</p></div>)}</div><div className="flex gap-2">{receivedShare.share_data.type === 'file' ? (<Button onClick={handleDownloadFile} disabled={isDownloading} className="flex-1 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700">{isDownloading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />} Download File</Button>) : (<Button onClick={handleCopyText} className="flex-1 bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700"><Copy className="w-4 h-4 mr-2" /> Copy Text</Button>)}<Button onClick={closeReceiveModal} variant="outline" className="border-slate-600 text-gray-300 hover:bg-slate-700">Close</Button></div></CardContent></Card></div>
         )}
         {activeChatUser && (
             <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
@@ -347,7 +392,6 @@ const App = () => {
                         {(chats[activeChatUser.user_id] || []).map((msg, index) => {
                             const isMyMessage = msg.sender === myCharacter;
                             if (isMyMessage) {
-                                // My message (right aligned)
                                 return (
                                     <div key={index} className="flex w-full justify-end">
                                         <div className="flex items-start gap-2.5">
@@ -359,7 +403,6 @@ const App = () => {
                                     </div>
                                 );
                             } else {
-                                // Their message (left aligned)
                                 return (
                                     <div key={index} className="flex w-full justify-start">
                                         <div className="flex items-start gap-2.5">
