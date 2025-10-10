@@ -72,7 +72,7 @@ const App = () => {
   const [showReceiveModal, setShowReceiveModal] = useState(false);
   const [receivedShare, setReceivedShare] = useState(null);
   const [isDownloading, setIsDownloading] = useState(false);
-  const [searchQuery, setSearchQuery] = useState(''); // <-- 1. ADDED STATE
+  const [searchQuery, setSearchQuery] = useState('');
 
   const [chats, setChats] = useState({});
   const [activeChatUser, setActiveChatUser] = useState(null);
@@ -312,7 +312,6 @@ const App = () => {
   const closeReceiveModal = () => { setShowReceiveModal(false); setReceivedShare(null); };
   const getFileIcon = (filename) => { const ext = filename?.split('.').pop()?.toLowerCase(); switch (ext) { case 'pdf': return '📄'; case 'doc': case 'docx': return '📝'; case 'jpg': case 'jpeg': case 'png': case 'gif': return '🖼️'; case 'mp4': case 'mov': return '🎥'; case 'mp3': case 'wav': return '🎵'; default: return '📁'; } };
   
-  // <-- 2. ADDED FILTERING LOGIC
   const filteredUsers = connectedUsers.filter(user =>
     user.character.toLowerCase().includes(searchQuery.toLowerCase())
   );
@@ -333,7 +332,6 @@ const App = () => {
             <Card className="bg-slate-800/50 border-slate-700 backdrop-blur-sm"><CardHeader><CardTitle className="text-white flex items-center gap-2"><FileText className="w-5 h-5" /> Share a Note</CardTitle></CardHeader><CardContent className="space-y-4"><Textarea placeholder="Type your message or paste text here..." value={textContent} onChange={(e) => setTextContent(e.target.value)} className="min-h-[120px] bg-slate-700/50 border-slate-600 text-white placeholder-gray-400" /><Button onClick={handleTextShare} disabled={!textContent.trim()} className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"><FileText className="w-4 h-4 mr-2" /> Share Note</Button></CardContent></Card>
         </div>
         
-        {/* <-- 3. REPLACED THIS ENTIRE CARD --> */}
         <Card className="mt-8 bg-slate-800/50 border-slate-700 backdrop-blur-sm">
             <CardHeader>
                 <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
@@ -342,11 +340,11 @@ const App = () => {
                 </CardTitle>
                 <div className="relative">
                     <Input 
-                    type="search" 
-                    placeholder="Search for a hero..." 
-                    className="w-full sm:w-64 bg-slate-700/50 border-slate-600 pl-8"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
+                        type="search" 
+                        placeholder="Search for a hero..." 
+                        className="w-full sm:w-64 bg-slate-700/50 border-slate-600 pl-8 text-white"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
                     />
                     <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
                 </div>
@@ -397,6 +395,7 @@ const App = () => {
                                         <div className="flex items-start gap-2.5">
                                             <div className="bg-blue-600 text-white p-3 rounded-lg max-w-xs md:max-w-md rounded-br-none">
                                                 <p className="text-sm" style={{ wordBreak: 'break-word' }}>{msg.content}</p>
+
                                             </div>
                                             <Badge variant="secondary" className="bg-blue-600 text-white w-8 h-8 flex items-center justify-center flex-shrink-0">{myCharacter.charAt(0)}</Badge>
                                         </div>
