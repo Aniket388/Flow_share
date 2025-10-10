@@ -188,7 +188,6 @@ manager = ConnectionManager()
 UPLOAD_DIR = Path("/tmp/flowshare_files")
 UPLOAD_DIR.mkdir(exist_ok=True)
 
-# MODIFIED: Corrected the WebSocket endpoint logic
 @app.websocket("/api/ws/{user_id}")
 async def websocket_endpoint(websocket: WebSocket, user_id: str):
     await manager.connect(websocket, user_id)
@@ -217,23 +216,60 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str):
 @app.api_route("/api/health", methods=["GET", "HEAD"])
 async def health_check(): return {"status": "healthy", "service": "FlowShare"}
 
-# All other endpoints (upload, download, etc.) remain unchanged
+
+# --- THIS IS THE UPDATED FUNCTION ---
 @app.post("/api/upload")
-async def upload_file(file: UploadFile = File(...), db: AsyncSession = Depends(get_db)):
+async def upload_files(files: List[UploadFile] = File(...), db: AsyncSession = Depends(get_db)):
+    # Check total size first
+    total_size = sum(file.size for file in files)
+    MAX_FILE_SIZE = 100 * 1024 * 1024
+    if total_size > MAX_FILE_SIZE:
+        raise HTTPException(
+            status_code=413, 
+            detail=f"Total size of files ({total_size // (1024*1024)}MB) exceeds the 100MB limit."
+        )
+
+    uploaded_files_data = []
     try:
-        MAX_FILE_SIZE = 100 * 1024 * 1024
-        if file.size and file.size > MAX_FILE_SIZE:
-            raise HTTPException(status_code=413, detail=f"File is too large. Maximum size is 100MB.")
-        file_id = str(uuid.uuid4())
-        file_path = UPLOAD_DIR / f"{file_id}_{file.filename}"
-        with open(file_path, "wb") as buffer: shutil.copyfileobj(file.file, buffer)
-        new_file = FileStorage(file_id=file_id, filename=file.filename, content_type=file.content_type, size=file.size, file_path=str(file_path), expires_at=datetime.utcnow() + timedelta(minutes=30))
-        db.add(new_file)
+        for file in files:
+            file_id = str(uuid.uuid4())
+            file_path = UPLOAD_DIR / f"{file_id}_{file.filename}"
+            
+            with open(file_path, "wb") as buffer:
+                shutil.copyfileobj(file.file, buffer)
+
+            new_file = FileStorage(
+                file_id=file_id, 
+                filename=file.filename, 
+                content_type=file.content_type, 
+                size=file.size, 
+                file_path=str(file_path), 
+                expires_at=datetime.utcnow() + timedelta(minutes=30)
+            )
+            db.add(new_file)
+            uploaded_files_data.append({
+                "file_id": file_id,
+                "filename": file.filename,
+                "size": file.size,
+                "content_type": file.content_type,
+                "type": "file"
+            })
+        
         await db.commit()
-        return {"file_id": file_id, "filename": file.filename, "size": file.size, "content_type": file.content_type, "type": "file"}
+        # Return a special "bundle" type that contains all the file data
+        return {"type": "bundle", "files": uploaded_files_data}
+
     except Exception as e:
-        if isinstance(e, HTTPException): raise e
+        await db.rollback()
+        # Clean up any files that might have been saved before the error
+        for file_data in uploaded_files_data:
+            path_to_remove = UPLOAD_DIR / f"{file_data['file_id']}_{file_data['filename']}"
+            if path_to_remove.exists():
+                os.remove(path_to_remove)
+        if isinstance(e, HTTPException):
+            raise e
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.get("/api/download/{file_id}")
 async def download_file(file_id: str, db: AsyncSession = Depends(get_db)):
