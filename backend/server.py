@@ -244,7 +244,7 @@ async def upload_files(files: List[UploadFile] = File(...), db: AsyncSession = D
                 content_type=file.content_type, 
                 size=file.size, 
                 file_path=str(file_path), 
-                expires_at=datetime.utcnow() + timedelta(minutes=30)
+                expires_at=datetime.utcnow() + timedelta(minutes=10)
             )
             db.add(new_file)
             uploaded_files_data.append({
@@ -289,7 +289,7 @@ async def download_file(file_id: str, db: AsyncSession = Depends(get_db)):
 async def create_text_share(data: dict, db: AsyncSession = Depends(get_db)):
     try:
         share_id = str(uuid.uuid4())
-        new_text_share = TextShare(share_id=share_id, content=data.get("content", ""), title=data.get("title", "Shared Note"), expires_at=datetime.utcnow() + timedelta(minutes=30))
+        new_text_share = TextShare(share_id=share_id, content=data.get("content", ""), title=data.get("title", "Shared Note"), expires_at=datetime.utcnow() + timedelta(minutes=10))
         db.add(new_text_share)
         await db.commit()
         return {"share_id": share_id, "title": new_text_share.title, "content": new_text_share.content, "type": "text"}
