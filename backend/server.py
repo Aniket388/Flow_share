@@ -39,7 +39,7 @@ DATABASE_URL = os.environ.get("DATABASE_URL")
 if DATABASE_URL and DATABASE_URL.startswith("postgresql://"):
     DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://", 1)
 
-engine = create_async_engine(DATABASE_URL)
+engine = create_async_engine(DATABASE_URL, pool_pre_ping=True)
 AsyncSessionLocal = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 Base = declarative_base()
 
@@ -214,7 +214,13 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str):
         await manager.broadcast_user_list()
 
 @app.api_route("/api/health", methods=["GET", "HEAD"])
-async def health_check(): return {"status": "healthy", "service": "FlowShare"}
+async def health_check(db: AsyncSession = Depends(get_db)):
+    try:
+        # This pings the DB to keep it warm but "Idle"
+        await db.execute(select(1)) 
+        return {"status": "healthy", "service": "FlowShare"}
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"Database connection error: {e}")
 
 
 # --- THIS IS THE UPDATED FUNCTION ---
