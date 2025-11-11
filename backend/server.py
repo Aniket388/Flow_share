@@ -67,42 +67,53 @@ class TextShare(Base):
 # --- Background Cleanup Task ---
 async def cleanup_expired_data():
     while True:
-        await asyncio.sleep(240)  # Sleep for 4 minutes
+        await asyncio.sleep(600)  # Set to 10 minutes
         print("Running scheduled cleanup of expired data...")
-        
+
         async with AsyncSessionLocal() as db:
             try:
                 now = datetime.utcnow()
-                
+
+                # --- Handle Files ---
                 expired_files_query = select(FileStorage).where(FileStorage.expires_at < now)
                 result_files = await db.execute(expired_files_query)
                 expired_files = result_files.scalars().all()
 
+                deleted_files_count = 0
                 for file in expired_files:
                     try:
+                        # Safely try to delete the file from disk
                         file_path = Path(file.file_path)
                         if file_path.exists():
                             os.remove(file_path)
                     except Exception as e:
-                        print(f"Error deleting file {file.file_path} from disk: {e}")
-                    
-                    await db.delete(file)
+                        print(f"Error deleting disk file {file.file_path}: {e} (This is OK, deleting DB record.)")
+                        # Just print the error, don't crash.
 
+                    # Always delete the database record
+                    await db.delete(file)
+                    deleted_files_count += 1
+
+                # --- Handle Texts ---
                 expired_texts_query = select(TextShare).where(TextShare.expires_at < now)
                 result_texts = await db.execute(expired_texts_query)
                 expired_texts = result_texts.scalars().all()
 
+                deleted_texts_count = 0
                 for text in expired_texts:
                     await db.delete(text)
-                
-                if expired_files or expired_texts:
+                    deleted_texts_count += 1
+
+                # --- Commit Changes ---
+                if deleted_files_count > 0 or deleted_texts_count > 0:
                     await db.commit()
-                    print(f"Cleanup complete. Removed {len(expired_files)} files and {len(expired_texts)} text shares.")
+                    print(f"Cleanup complete. Removed {deleted_files_count} files and {deleted_texts_count} text shares.")
                 else:
                     print("No expired data to clean up.")
 
             except Exception as e:
-                print(f"An error occurred during scheduled cleanup: {e}")
+                # This is a major error (like DB connection)
+                print(f"A major error occurred during scheduled cleanup: {e}")
                 await db.rollback()
 
 # --- startup function to launch cleanup task ---
