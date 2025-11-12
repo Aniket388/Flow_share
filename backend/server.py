@@ -225,13 +225,8 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str):
         await manager.broadcast_user_list()
 
 @app.api_route("/api/health", methods=["GET", "HEAD"])
-async def health_check(db: AsyncSession = Depends(get_db)):
-    try:
-        # This pings the DB to keep it warm but "Idle"
-        await db.execute(select(1)) 
-        return {"status": "healthy", "service": "FlowShare"}
-    except Exception as e:
-        raise HTTPException(status_code=503, detail=f"Database connection error: {e}")
+async def health_check(): 
+    return {"status": "healthy", "service": "FlowShare"}
 
 
 # --- THIS IS THE UPDATED FUNCTION ---
