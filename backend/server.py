@@ -22,6 +22,7 @@ app = FastAPI()
 origins = [
     "https://flowshare.me",
     "https://www.flowshare.me",
+    "https://flowshare.netlify.app",
     "http://localhost:3000",
 ]
 
