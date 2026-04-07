@@ -68,7 +68,7 @@ class TextShare(Base):
 # --- Background Cleanup Task ---
 async def cleanup_expired_data():
     while True:
-        await asyncio.sleep(600)  # Set to 10 minutes
+        await asyncio.sleep(2400)  # Set to 40 minutes
         print("Running scheduled cleanup of expired data...")
 
         async with AsyncSessionLocal() as db:
