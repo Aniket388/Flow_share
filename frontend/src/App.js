@@ -65,7 +65,7 @@ const App = () => {
   const [selectedUsers, setSelectedUsers] = useState(new Set());
   const [modalSelectedUsers, setModalSelectedUsers] = useState(new Set());
   const [myCharacter, setMyCharacter] = useState('');
-  const [userId] = useState(() => `user_${crypto.randomUUID()}`);
+  const [userId] = useState(() => `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
   const [connectionStatus, setConnectionStatus] = useState('disconnected');
   const [currentShare, setCurrentShare] = useState(null);
   const [showShareModal, setShowShareModal] = useState(false);
