@@ -140,9 +140,9 @@ class ConnectionManager:
         self.active_connections: Dict[str, WebSocket] = {}
         self.user_sessions: Dict[str, dict] = {}
 
-async def connect(self, websocket: WebSocket, user_id: str):
-    await websocket.accept()
-    self.active_connections[user_id] = websocket
+    async def connect(self, websocket: WebSocket, user_id: str):
+        await websocket.accept()
+        self.active_connections[user_id] = websocket
         character = random.choice([c for c in MARVEL_CHARACTERS if c not in [s.get('character') for s in self.user_sessions.values()]] or MARVEL_CHARACTERS)
         self.user_sessions[user_id] = {'character': character, 'websocket': websocket}
         await self.send_personal_message(user_id, {'type': 'character_assigned', 'character': character, 'user_id': user_id})
