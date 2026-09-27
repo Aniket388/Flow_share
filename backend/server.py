@@ -148,10 +148,10 @@ async def connect(self, websocket: WebSocket, user_id: str):
         return False
 
     self.active_connections[user_id] = websocket
-        character = random.choice([c for c in MARVEL_CHARACTERS if c not in [s.get('character') for s in self.user_sessions.values()]] or MARVEL_CHARACTERS)
-        self.user_sessions[user_id] = {'character': character, 'websocket': websocket}
-        await self.send_personal_message(user_id, {'type': 'character_assigned', 'character': character, 'user_id': user_id})
-        await self.broadcast_user_list()
+    character = random.choice([c for c in MARVEL_CHARACTERS if c not in [s.get('character') for s in self.user_sessions.values()]] or MARVEL_CHARACTERS)
+    self.user_sessions[user_id] = {'character': character, 'websocket': websocket}
+    await self.send_personal_message(user_id, {'type': 'character_assigned', 'character': character, 'user_id': user_id})
+    await self.broadcast_user_list()
 
     def disconnect(self, user_id: str):
         if user_id in self.active_connections: del self.active_connections[user_id]
