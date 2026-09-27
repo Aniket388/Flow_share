@@ -142,16 +142,11 @@ class ConnectionManager:
 
 async def connect(self, websocket: WebSocket, user_id: str):
     await websocket.accept()
-
-    if user_id in self.active_connections:
-        await websocket.close(code=1008, reason="User ID already in use")
-        return False
-
     self.active_connections[user_id] = websocket
-    character = random.choice([c for c in MARVEL_CHARACTERS if c not in [s.get('character') for s in self.user_sessions.values()]] or MARVEL_CHARACTERS)
-    self.user_sessions[user_id] = {'character': character, 'websocket': websocket}
-    await self.send_personal_message(user_id, {'type': 'character_assigned', 'character': character, 'user_id': user_id})
-    await self.broadcast_user_list()
+        character = random.choice([c for c in MARVEL_CHARACTERS if c not in [s.get('character') for s in self.user_sessions.values()]] or MARVEL_CHARACTERS)
+        self.user_sessions[user_id] = {'character': character, 'websocket': websocket}
+        await self.send_personal_message(user_id, {'type': 'character_assigned', 'character': character, 'user_id': user_id})
+        await self.broadcast_user_list()
 
     def disconnect(self, user_id: str):
         if user_id in self.active_connections: del self.active_connections[user_id]
@@ -207,11 +202,7 @@ UPLOAD_DIR.mkdir(exist_ok=True)
 
 @app.websocket("/api/ws/{user_id}")
 async def websocket_endpoint(websocket: WebSocket, user_id: str):
-    connected = await manager.connect(websocket, user_id)
-
-    if not connected:
-        return
-
+    await manager.connect(websocket, user_id)
     try:
         while True:
             data = await websocket.receive_text()
