@@ -207,7 +207,11 @@ UPLOAD_DIR.mkdir(exist_ok=True)
 
 @app.websocket("/api/ws/{user_id}")
 async def websocket_endpoint(websocket: WebSocket, user_id: str):
-    await manager.connect(websocket, user_id)
+    connected = await manager.connect(websocket, user_id)
+
+    if not connected:
+        return
+
     try:
         while True:
             data = await websocket.receive_text()
